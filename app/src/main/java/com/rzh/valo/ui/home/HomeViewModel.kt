@@ -20,6 +20,8 @@ data class HomeUiState(
     val live: List<MatchItem> = emptyList(),
     val scheduled: List<MatchItem> = emptyList(),
     val finished: List<MatchItem> = emptyList(),
+    /** 当前筛选的比赛状态；null 表示全部 */
+    val filter: Int? = null,
 ) {
     val total: Int get() = live.size + scheduled.size + finished.size
     val hasMatches: Boolean get() = total > 0
@@ -35,6 +37,11 @@ class HomeViewModel(private val repository: MatchRepository) : ViewModel() {
     }
 
     fun refresh() = load(force = true)
+
+    /** 点击汇总胶囊切换筛选；再次点击取消筛选回到全部 */
+    fun toggleFilter(status: Int) {
+        _state.update { it.copy(filter = if (it.filter == status) null else status) }
+    }
 
     private fun load(force: Boolean = false) {
         viewModelScope.launch {

@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -34,9 +35,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -188,7 +189,16 @@ private fun DetailContent(item: MatchItem, round: RoundData) {
         if (links.isNotEmpty()) {
             Spacer(Modifier.height(20.dp))
             HorizontalDivider()
-            links.distinctBy { it.desc + it.url }.forEach { link -> LinkRow(link) }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "相关链接",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(links.distinctBy { it.desc + it.url }) { link -> LinkPill(link) }
+            }
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -390,73 +400,68 @@ private fun LegendDot(color: Color, label: String) {
     }
 }
 
-/** 本图选手数据：主队/客队两列 */
+/** 本图选手数据：按队伍分组的单列表，ID 不截断 */
 @Composable
 private fun PlayerTable(map: MapRoundData) {
-    val mainPlayers = map.players.filter { it.isMain }.sortedWith(compareByDescending<PlayerMapStats> { it.acs ?: 0.0 })
-    val guestPlayers = map.players.filter { !it.isMain }.sortedWith(compareByDescending<PlayerMapStats> { it.acs ?: 0.0 })
+    val mainPlayers = map.players.filter { it.isMain }.sortedByDescending { it.acs ?: 0.0 }
+    val guestPlayers = map.players.filter { !it.isMain }.sortedByDescending { it.acs ?: 0.0 }
     Column {
-        Row {
-            Column(Modifier.weight(1f)) {
-                PlayerGroupHeader(map.mainTeam?.short ?: "主队")
-                mainPlayers.forEach { PlayerRow(it) }
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                PlayerGroupHeader(map.guestTeam?.short ?: "客队")
-                guestPlayers.forEach { PlayerRow(it) }
-            }
-        }
+        PlayerGroupHeader(map.mainTeam)
+        mainPlayers.forEach { PlayerRow(it) }
+        Spacer(Modifier.height(10.dp))
+        PlayerGroupHeader(map.guestTeam)
+        guestPlayers.forEach { PlayerRow(it) }
     }
 }
 
 @Composable
-private fun PlayerGroupHeader(name: String) {
-    Text(
-        name,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun PlayerGroupHeader(team: com.rzh.valo.data.RoundTeam?) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(vertical = 6.dp),
-    )
+    ) {
+        TeamLogo(team?.icon, size = 18)
+        Spacer(Modifier.width(6.dp))
+        Text(
+            team?.short ?: team?.name ?: "队伍",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
 }
 
 @Composable
 private fun PlayerRow(player: PlayerMapStats) {
-    val kda = "${player.kills}/${player.deaths}/${player.assists}"
     val nick = player.career?.idName?.takeIf { it.isNotBlank() } ?: player.player?.realName.orEmpty()
+    val kda = "${player.kills}/${player.deaths}/${player.assists}"
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
     ) {
-        TeamLogo(player.hero?.icon, size = 22)
-        Spacer(Modifier.width(8.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                nick,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (player.hero?.nameZh?.isNotBlank() == true) {
-                Text(
-                    player.hero.nameZh,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Spacer(Modifier.width(6.dp))
+        TeamLogo(player.hero?.icon, size = 24, shape = RoundedCornerShape(8.dp))
+        Spacer(Modifier.width(10.dp))
         Text(
-            kda,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            nick,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(10.dp))
         Text(
-            player.acs?.let { "%.0f".format(it) } ?: "—",
+            kda,
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.width(14.dp))
+        Text(
+            player.acs?.let { "%.0f".format(it) } ?: "—",
+            style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(38.dp),
         )
     }
 }
@@ -527,19 +532,37 @@ private fun ScoreBlock(item: MatchItem, modifier: Modifier = Modifier) {
     }
 }
 
+/** 低调的外部链接胶囊 */
 @Composable
-private fun LinkRow(link: LinkInfo) {
+private fun LinkPill(link: LinkInfo) {
     val context = LocalContext.current
-    ListItem(
-        headlineContent = { Text(link.desc ?: "相关链接", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(link.url.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        trailingContent = { Icon(Icons.AutoMirrored.Rounded.ExitToApp, contentDescription = "打开") },
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                runCatching {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link.url)))
-                }
-            },
-    )
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.clickable {
+            runCatching {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link.url)))
+            }
+        },
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+        ) {
+            Text(
+                link.desc ?: "链接",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                Icons.AutoMirrored.Rounded.ExitToApp,
+                contentDescription = "打开",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(12.dp),
+            )
+        }
+    }
 }

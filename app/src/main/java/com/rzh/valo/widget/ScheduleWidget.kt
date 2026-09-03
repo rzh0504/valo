@@ -14,8 +14,11 @@ import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.lazy.LazyColumn
+import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
+import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -39,39 +42,50 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 /**
  * 「近期比赛」桌面小组件：展示未来几场未开赛/进行中的比赛，
- * 无未来赛程时回退展示最近已结束的比赛。数据来自磁盘快照，
- * 由 [WidgetRefreshWorker] 每小时刷新一次，添加小组件时自动启动。
+ * 无未来赛程时回退展示最近已结束的比赛。列表可滚动；背景按系统
+ * 深浅色模式取色，透明度可在应用设置中调节。数据来自磁盘快照，
+ * 由 [WidgetRefreshWorker] 每小时刷新一次。
  */
 object ScheduleWidget : GlanceAppWidget() {
 
     override val sizeMode: SizeMode = SizeMode.Single
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val repository = (context.applicationContext as ValoApplication).container.repository
-        val snapshot = withContext(Dispatchers.IO) { repository.loadSnapshot() }
-        provideContent { Content(snapshot?.items.orEmpty()) }
+        val container = (context.applicationContext as ValoApplication).container
+        val (snapshot, opacity) = withContext(Dispatchers.IO) {
+            val snap = container.repository.loadSnapshot()
+            val op = container.settingsStore.widgetOpacity.first()
+            snap to op
+        }
+        provideContent { Content(snapshot?.items.orEmpty(), opacity) }
     }
 
     @Composable
-    private fun Content(items: List<MatchItem>) {
+    private fun Content(items: List<MatchItem>, opacity: Float) {
         Box(
-            modifier = GlanceModifier.fillMaxSize().background(WidgetColors.Background).padding(12.dp),
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .background(WidgetColors.background(opacity))
+                .padding(12.dp),
         ) {
             Column(modifier = GlanceModifier.fillMaxSize()) {
                 Text(
                     "无畏契约赛程",
                     style = TextStyle(WidgetColors.OnBackground, fontSize = 13.sp, fontWeight = FontWeight.Bold),
                 )
-                Spacer(GlanceModifier.height(8.dp))
+                Spacer(GlanceModifier.height(6.dp))
                 val rows = widgetRows(items)
                 if (rows.isEmpty()) {
                     Text("暂无比赛数据，打开应用刷新", style = TextStyle(WidgetColors.Secondary, fontSize = 12.sp))
                 } else {
-                    rows.forEach { row -> WidgetRow(row) }
+                    LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+                        items(rows) { row -> WidgetRow(row) }
+                    }
                 }
             }
         }
@@ -82,7 +96,7 @@ object ScheduleWidget : GlanceAppWidget() {
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp)
+                .padding(vertical = 5.dp)
                 .clickable(
                     actionStartActivity<MainActivity>(
                         parameters = actionParametersOf(MATCH_ID_KEY to row.matchId),
@@ -111,9 +125,9 @@ object ScheduleWidget : GlanceAppWidget() {
         val upcoming = items
             .filter { it.status == MatchStatus.LIVE || (it.status == MatchStatus.SCHEDULED && it.startTime >= now) }
             .sortedBy { it.startTime }
-            .take(5)
+            .take(8)
         val selected = upcoming.ifEmpty {
-            items.filter { it.status == MatchStatus.FINISHED }.sortedByDescending { it.startTime }.take(4)
+            items.filter { it.status == MatchStatus.FINISHED }.sortedByDescending { it.startTime }.take(6)
         }
         return selected.map { item ->
             val main = item.versus?.mainCamp?.firstOrNull()?.displayName ?: "待定"
@@ -143,15 +157,22 @@ object ScheduleWidget : GlanceAppWidget() {
         }
     }
 
-    private fun formatClock(epochMillis: Long): String =
-        DateTimeFormatter.ofPattern("HH:mm").withZone(CN_ZONE).format(Instant.ofEpochMilli(epochMillis))
+    val MATCH_ID_KEY = ActionParameters.Key<String>(MainActivity.EXTRA_MATCH_ID)
+}
 
-    val MATCH_ID_KEY = ActionParameters.Key<String>(MainActivity.EXTRA_MATCH_ID)}
-
+/** 小组件配色：跟随系统深浅色模式（day/night 工厂在 androidx.glance.color 包） */
 private object WidgetColors {
-    val Background = ColorProvider(Color(0xFF151519))
-    val OnBackground = ColorProvider(Color(0xFFF2F2F5))
-    val Secondary = ColorProvider(Color(0xFF9A9AA3))
+    fun background(alpha: Float): ColorProvider =
+        androidx.glance.color.ColorProvider(
+            Color(0xFFFFFFFF).copy(alpha = alpha),
+            Color(0xFF151519).copy(alpha = alpha),
+        )
+
+    val OnBackground: ColorProvider =
+        androidx.glance.color.ColorProvider(Color(0xFF1C1B1F), Color(0xFFF2F2F5))
+
+    val Secondary: ColorProvider =
+        androidx.glance.color.ColorProvider(Color(0xFF63636B), Color(0xFF9A9AA3))
 }
 
 class ScheduleWidgetReceiver : GlanceAppWidgetReceiver() {

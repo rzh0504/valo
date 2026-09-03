@@ -28,10 +28,7 @@ class WidgetRefreshWorker(
             val (start, end) = repository.widgetWindow()
             val items = repository.schedule(start, end, force = true)
             repository.saveSnapshot(items)
-            val manager = GlanceAppWidgetManager(applicationContext)
-            manager.getGlanceIds(ScheduleWidget::class.java).forEach { glanceId ->
-                ScheduleWidget.update(applicationContext, glanceId)
-            }
+            updateAllScheduleWidgets(applicationContext)
             Result.success()
         } catch (e: Exception) {
             if (runAttemptCount < 3) Result.retry() else Result.failure()

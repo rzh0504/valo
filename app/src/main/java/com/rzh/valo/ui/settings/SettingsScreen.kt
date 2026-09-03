@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,10 +25,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -38,14 +44,19 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.BuildConfig
 import com.rzh.valo.ValoApplication
 import com.rzh.valo.data.ThemeMode
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen() {
     val app = LocalContext.current.applicationContext as ValoApplication
-    val viewModel: SettingsViewModel = viewModel { SettingsViewModel(app.container.settingsStore) }
+    val viewModel: SettingsViewModel = viewModel {
+        SettingsViewModel(app.container, app.applicationContext)
+    }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
+    val widgetOpacity by viewModel.widgetOpacity.collectAsStateWithLifecycle()
+    var opacityDraft by remember(widgetOpacity) { mutableFloatStateOf(widgetOpacity) }
 
     Column(
         modifier = Modifier
@@ -93,14 +104,40 @@ fun SettingsScreen() {
 
         Spacer(Modifier.height(14.dp))
 
+        SettingsCard(title = "小组件", icon = Icons.Rounded.Widgets) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text("背景不透明度", style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "${(opacityDraft * 100).roundToInt()}%",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Slider(
+                value = opacityDraft,
+                onValueChange = { opacityDraft = it },
+                onValueChangeFinished = { viewModel.setWidgetOpacity(opacityDraft) },
+                valueRange = 0.2f..1f,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "拖动后松手即应用，重新添加小组件或等待下次刷新也会生效",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Spacer(Modifier.height(14.dp))
+
         SettingsCard(title = "关于", icon = Icons.Rounded.Info) {
             Text(
-                "数据来自 haojiao.cc，仅用于学习目的。",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
                 "版本 ${BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "数据来自 haojiao.cc，仅用于学习目的。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

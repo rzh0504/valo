@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -72,9 +73,9 @@ fun Modifier.bouncyPress(interactionSource: MutableInteractionSource): Modifier 
     }
 }
 
-/** 队伍图标：不做圆形裁切，原样展示；无图时用浅色圆角块占位 */
+/** 队伍/英雄图标：不做圆形裁切，原样展示；传入 shape 时做对应圆角，无图时用浅色块占位 */
 @Composable
-fun TeamLogo(path: String?, size: Int, modifier: Modifier = Modifier) {
+fun TeamLogo(path: String?, size: Int, modifier: Modifier = Modifier, shape: Shape? = null) {
     val url = HaojiaoApi.imageUrl(path)
     if (url != null) {
         AsyncImage(
@@ -84,13 +85,15 @@ fun TeamLogo(path: String?, size: Int, modifier: Modifier = Modifier) {
                 .build(),
             contentDescription = null,
             contentScale = ContentScale.Fit,
-            modifier = modifier.size(size.dp),
+            modifier = modifier
+                .size(size.dp)
+                .let { m -> if (shape != null) m.clip(shape) else m },
         )
     } else {
         Box(
             modifier = modifier
                 .size(size.dp)
-                .clip(MaterialTheme.shapes.extraSmall)
+                .clip(shape ?: MaterialTheme.shapes.extraSmall)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         )
     }
