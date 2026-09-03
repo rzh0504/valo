@@ -82,7 +82,7 @@ object ScheduleWidget : GlanceAppWidget() {
         Row(
             modifier = GlanceModifier
                 .fillMaxWidth()
-                .padding(vertical = 5.dp)
+                .padding(vertical = 4.dp)
                 .clickable(
                     actionStartActivity<MainActivity>(
                         parameters = actionParametersOf(MATCH_ID_KEY to row.matchId),
@@ -90,23 +90,20 @@ object ScheduleWidget : GlanceAppWidget() {
                 ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(row.timeText, style = TextStyle(WidgetColors.Secondary, fontSize = 11.sp))
-            Spacer(GlanceModifier.width(10.dp))
-            Column {
-                Text(
-                    row.teamsText,
-                    style = TextStyle(WidgetColors.OnBackground, fontSize = 12.sp, fontWeight = FontWeight.Medium),
-                )
-                Text(row.subText, style = TextStyle(WidgetColors.Secondary, fontSize = 9.sp), maxLines = 1)
-            }
+            Text(row.timeText, style = TextStyle(WidgetColors.Secondary, fontSize = 10.sp))
+            Spacer(GlanceModifier.width(8.dp))
+            Text(
+                row.lineText,
+                style = TextStyle(WidgetColors.OnBackground, fontSize = 11.sp),
+                maxLines = 1,
+            )
         }
     }
 
     private data class RowModel(
         val matchId: String,
         val timeText: String,
-        val teamsText: String,
-        val subText: String,
+        val lineText: String,
     )
 
     private fun widgetRows(items: List<MatchItem>): List<RowModel> {
@@ -115,7 +112,7 @@ object ScheduleWidget : GlanceAppWidget() {
         val upcoming = items
             .filter { it.status == MatchStatus.LIVE || (it.status == MatchStatus.SCHEDULED && it.startTime >= now) }
             .sortedBy { it.startTime }
-            .take(4)
+            .take(5)
         val selected = upcoming.ifEmpty {
             items.filter { it.status == MatchStatus.FINISHED }.sortedByDescending { it.startTime }.take(4)
         }
@@ -127,11 +124,11 @@ object ScheduleWidget : GlanceAppWidget() {
             } else {
                 "$main ${item.versus?.mainScore ?: 0} : ${item.versus?.guestScore ?: 0} $guest"
             }
+            val sub = item.group?.nameSub ?: item.group?.nameMain ?: item.tournament?.nameMain.orEmpty()
             RowModel(
                 matchId = item.id,
                 timeText = formatTime(item.startTime, zone, now),
-                teamsText = teams,
-                subText = item.group?.nameSub ?: item.group?.nameMain ?: item.tournament?.nameMain.orEmpty(),
+                lineText = if (sub.isBlank()) teams else "$teams · $sub",
             )
         }
     }

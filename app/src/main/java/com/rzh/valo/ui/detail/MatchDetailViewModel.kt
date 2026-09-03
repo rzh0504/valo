@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rzh.valo.data.MatchItem
 import com.rzh.valo.data.MatchRepository
+import com.rzh.valo.data.MatchStatus
+import com.rzh.valo.data.RoundData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -12,8 +14,12 @@ import kotlinx.coroutines.launch
 data class MatchDetailUiState(
     val loading: Boolean = true,
     val item: MatchItem? = null,
+    /** 已开赛/完赛时加载的地图小局明细；未开赛为空对象 */
+    val round: RoundData = RoundData(),
     val error: String? = null,
-)
+) {
+    val hasMaps: Boolean get() = round.list.isNotEmpty()
+}
 
 class MatchDetailViewModel(
     private val repository: MatchRepository,
@@ -34,7 +40,12 @@ class MatchDetailViewModel(
             _state.update { it.copy(loading = true, error = null) }
             try {
                 val item = repository.matchDetail(matchId, force)
-                _state.update { it.copy(loading = false, item = item) }
+                val round = if (item.status != MatchStatus.SCHEDULED) {
+                    runCatching { repository.matchRound(matchId, force) }.getOrDefault(RoundData())
+                } else {
+                    RoundData()
+                }
+                _state.update { it.copy(loading = false, item = item, round = round) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = "加载失败，请重试") }
             }

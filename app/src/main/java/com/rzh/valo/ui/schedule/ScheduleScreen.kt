@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -19,32 +20,33 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.ValoApplication
+import com.rzh.valo.ui.components.LoadingDots
 import com.rzh.valo.ui.components.MatchCard
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -61,8 +63,7 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
         if (!scrolledToToday && state.days.isNotEmpty()) {
             val index = state.days.indexOfFirst { it.isToday }
             val target = if (index >= 0) index else {
-                // 窗口内没有今天的比赛时，落到第一个不早于今天的分组
-                state.days.indexOfFirst { !it.date.isBefore(java.time.LocalDate.now()) }
+                state.days.indexOfFirst { !it.date.isBefore(LocalDate.now()) }
             }
             if (target > 0) {
                 listState.scrollToItem(headerOffset(state, target))
@@ -71,51 +72,20 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("无畏契约赛程") },
-                actions = {
-                    Text(
-                        state.windowLabel,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    IconButton(onClick = { viewModel.shiftWeek(-1) }) {
-                        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "上一周")
-                    }
-                    IconButton(onClick = { viewModel.shiftWeek(1) }) {
-                        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "下一周")
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
-            FilterRow(state, viewModel)
-            PullToRefreshBox(
-                isRefreshing = state.refreshing,
-                onRefresh = { viewModel.refresh() },
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                when {
-                    state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                    state.error != null && state.days.isEmpty() -> ErrorPane(
-                        message = state.error!!,
-                        onRetry = { viewModel.refresh() },
-                    )
-                    state.days.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            "该时间段内暂无比赛",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    else -> MatchList(state, listState, onOpenMatch)
-                }
+    PullToRefreshBox(
+        isRefreshing = state.refreshing,
+        onRefresh = { viewModel.refresh() },
+        modifier = Modifier.fillMaxSize().statusBarsPadding(),
+    ) {
+        when {
+            state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                LoadingDots()
             }
+            state.error != null && state.days.isEmpty() -> ErrorPane(
+                message = state.error!!,
+                onRetry = { viewModel.refresh() },
+            )
+            else -> ScheduleList(state, listState, viewModel, onOpenMatch)
         }
     }
 }
@@ -124,41 +94,32 @@ private fun headerOffset(state: ScheduleUiState, dayIndex: Int): Int =
     state.days.take(dayIndex).sumOf { it.matches.size + 1 }
 
 @Composable
-private fun FilterRow(state: ScheduleUiState, viewModel: ScheduleViewModel) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-    ) {
-        FilterChip(
-            selected = state.filter == ScheduleFilter.ALL,
-            onClick = { viewModel.setFilter(ScheduleFilter.ALL) },
-            label = { Text("全部") },
-        )
-        FilterChip(
-            selected = state.filter == ScheduleFilter.SCHEDULED,
-            onClick = { viewModel.setFilter(ScheduleFilter.SCHEDULED) },
-            label = { Text("未开始") },
-        )
-        FilterChip(
-            selected = state.filter == ScheduleFilter.FINISHED,
-            onClick = { viewModel.setFilter(ScheduleFilter.FINISHED) },
-            label = { Text("已结束") },
-        )
-        Spacer(Modifier.weight(1f))
-        if (!state.isDefaultWindow) {
-            TextButton(onClick = { viewModel.backToDefault() }) { Text("回到近期") }
-        }
-    }
-}
-
-@Composable
-private fun MatchList(state: ScheduleUiState, listState: LazyListState, onOpenMatch: (String) -> Unit) {
+private fun ScheduleList(
+    state: ScheduleUiState,
+    listState: LazyListState,
+    viewModel: ScheduleViewModel,
+    onOpenMatch: (String) -> Unit,
+) {
     LazyColumn(
         state = listState,
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
+        item(key = "header") { ScheduleHeader(state, viewModel) }
+
+        if (state.days.isEmpty()) {
+            item(key = "empty") {
+                Box(Modifier.fillMaxWidth().padding(vertical = 64.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        "该时间段内暂无比赛",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
         state.days.forEach { day ->
             item(key = "header_${day.date}") {
                 val fmt = DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.CHINA)
@@ -167,6 +128,7 @@ private fun MatchList(state: ScheduleUiState, listState: LazyListState, onOpenMa
                         if (day.isToday) "今天" else day.date.format(fmt),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
                     )
                     if (day.isToday) {
                         Spacer(Modifier.width(6.dp))
@@ -182,6 +144,7 @@ private fun MatchList(state: ScheduleUiState, listState: LazyListState, onOpenMa
                 MatchCard(item = match, onClick = { onOpenMatch(match.id) })
             }
         }
+
         item(key = "footer") {
             Text(
                 "共 ${state.totalCount} 场 · 数据来自号角 haojiao.cc",
@@ -190,6 +153,54 @@ private fun MatchList(state: ScheduleUiState, listState: LazyListState, onOpenMa
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScheduleHeader(state: ScheduleUiState, viewModel: ScheduleViewModel) {
+    Column(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 8.dp)) {
+        Text(
+            "赛程",
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            IconButton(onClick = { viewModel.shiftWeek(-1) }) {
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "上一周")
+            }
+            Text(
+                state.windowLabel,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center,
+            )
+            IconButton(onClick = { viewModel.shiftWeek(1) }) {
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "下一周")
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
+                val options = listOf(
+                    ScheduleFilter.ALL to "全部",
+                    ScheduleFilter.SCHEDULED to "未开始",
+                    ScheduleFilter.FINISHED to "已结束",
+                )
+                options.forEachIndexed { index, (value, label) ->
+                    SegmentedButton(
+                        selected = state.filter == value,
+                        onClick = { viewModel.setFilter(value) },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                        label = { Text(label) },
+                    )
+                }
+            }
+            if (!state.isDefaultWindow) {
+                TextButton(onClick = { viewModel.backToDefault() }) { Text("回到近期") }
+            }
         }
     }
 }
