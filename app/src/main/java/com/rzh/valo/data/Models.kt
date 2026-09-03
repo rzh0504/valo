@@ -1,7 +1,11 @@
 package com.rzh.valo.data
 
+import java.time.ZoneId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+
+/** 站点赛程时间以中国标准时间为准，展示统一使用 Asia/Shanghai，不跟随设备时区 */
+val CN_ZONE: ZoneId = ZoneId.of("Asia/Shanghai")
 
 /** 比赛状态（实测语义）：1 未开始 · 2 进行中 · 3 已结束 */
 object MatchStatus {

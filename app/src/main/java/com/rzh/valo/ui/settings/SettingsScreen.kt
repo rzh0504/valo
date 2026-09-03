@@ -1,6 +1,5 @@
 package com.rzh.valo.ui.settings
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,13 +12,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -29,7 +25,6 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -48,12 +43,9 @@ import com.rzh.valo.data.ThemeMode
 @Composable
 fun SettingsScreen() {
     val app = LocalContext.current.applicationContext as ValoApplication
-    val viewModel: SettingsViewModel = viewModel {
-        SettingsViewModel(app.container, app.applicationContext)
-    }
+    val viewModel: SettingsViewModel = viewModel { SettingsViewModel(app.container.settingsStore) }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
-    val widgetRefreshing by viewModel.widgetRefreshing.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -101,31 +93,17 @@ fun SettingsScreen() {
 
         Spacer(Modifier.height(14.dp))
 
-        SettingsCard(title = "小组件", icon = Icons.Rounded.Sync) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.weight(1f)) {
-                    Text("立即刷新数据", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        "拉取近期赛程并更新桌面小组件（每小时也会自动刷新）",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (widgetRefreshing) {
-                    CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.5.dp)
-                } else {
-                    TextButton(onClick = { viewModel.refreshWidgetNow() }) { Text("刷新") }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(14.dp))
-
         SettingsCard(title = "关于", icon = Icons.Rounded.Info) {
-            AboutRow("数据来源", "号角 haojiao.cc")
-            AboutRow("用途", "仅作本地展示，无登录与上传")
-            AboutRow("请求频率", "赛程窗口 5 分钟缓存 · 详情 15 分钟缓存 · 小组件每小时 1 次")
-            AboutRow("版本", BuildConfig.VERSION_NAME)
+            Text(
+                "数据来自 haojiao.cc，仅用于学习目的。",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "版本 ${BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         Spacer(Modifier.height(24.dp))
@@ -147,13 +125,5 @@ private fun SettingsCard(title: String, icon: ImageVector, content: @Composable 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
             content()
         }
-    }
-}
-
-@Composable
-private fun AboutRow(label: String, value: String) {
-    Column(Modifier.padding(vertical = 5.dp)) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyMedium)
     }
 }

@@ -32,10 +32,10 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.rzh.valo.MainActivity
 import com.rzh.valo.ValoApplication
+import com.rzh.valo.data.CN_ZONE
 import com.rzh.valo.data.MatchItem
 import com.rzh.valo.data.MatchStatus
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -107,7 +107,6 @@ object ScheduleWidget : GlanceAppWidget() {
     )
 
     private fun widgetRows(items: List<MatchItem>): List<RowModel> {
-        val zone = ZoneId.systemDefault()
         val now = System.currentTimeMillis()
         val upcoming = items
             .filter { it.status == MatchStatus.LIVE || (it.status == MatchStatus.SCHEDULED && it.startTime >= now) }
@@ -127,16 +126,16 @@ object ScheduleWidget : GlanceAppWidget() {
             val sub = item.group?.nameSub ?: item.group?.nameMain ?: item.tournament?.nameMain.orEmpty()
             RowModel(
                 matchId = item.id,
-                timeText = formatTime(item.startTime, zone, now),
+                timeText = formatTime(item.startTime, now),
                 lineText = if (sub.isBlank()) teams else "$teams · $sub",
             )
         }
     }
 
-    private fun formatTime(epochMillis: Long, zone: ZoneId, now: Long): String {
-        val date = Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate()
-        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
-        val clock = DateTimeFormatter.ofPattern("HH:mm").format(Instant.ofEpochMilli(epochMillis).atZone(zone))
+    private fun formatTime(epochMillis: Long, now: Long): String {
+        val date = Instant.ofEpochMilli(epochMillis).atZone(CN_ZONE).toLocalDate()
+        val today = Instant.ofEpochMilli(now).atZone(CN_ZONE).toLocalDate()
+        val clock = DateTimeFormatter.ofPattern("HH:mm").format(Instant.ofEpochMilli(epochMillis).atZone(CN_ZONE))
         return when {
             date == today -> "今天 $clock"
             date == today.plusDays(1) -> "明天 $clock"
@@ -145,7 +144,7 @@ object ScheduleWidget : GlanceAppWidget() {
     }
 
     private fun formatClock(epochMillis: Long): String =
-        DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(epochMillis))
+        DateTimeFormatter.ofPattern("HH:mm").withZone(CN_ZONE).format(Instant.ofEpochMilli(epochMillis))
 
     val MATCH_ID_KEY = ActionParameters.Key<String>(MainActivity.EXTRA_MATCH_ID)}
 

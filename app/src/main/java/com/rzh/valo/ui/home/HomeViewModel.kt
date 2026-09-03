@@ -2,11 +2,11 @@ package com.rzh.valo.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rzh.valo.data.CN_ZONE
 import com.rzh.valo.data.MatchItem
 import com.rzh.valo.data.MatchRepository
 import com.rzh.valo.data.MatchStatus
 import java.time.LocalDate
-import java.time.ZoneId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -40,10 +40,9 @@ class HomeViewModel(private val repository: MatchRepository) : ViewModel() {
         viewModelScope.launch {
             _state.update { it.copy(loading = !it.hasMatches, refreshing = force, error = null) }
             try {
-                val zone = ZoneId.systemDefault()
-                val today = LocalDate.now(zone)
-                val start = today.atStartOfDay(zone).toInstant().toEpochMilli()
-                val end = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+                val today = LocalDate.now(CN_ZONE)
+                val start = today.atStartOfDay(CN_ZONE).toInstant().toEpochMilli()
+                val end = today.plusDays(1).atStartOfDay(CN_ZONE).toInstant().toEpochMilli()
                 val items = repository.schedule(start, end, force)
                 _state.update {
                     it.copy(

@@ -2,12 +2,13 @@ package com.rzh.valo.ui.schedule
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rzh.valo.data.CN_ZONE
 import com.rzh.valo.data.MatchItem
 import com.rzh.valo.data.MatchRepository
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -93,15 +94,14 @@ class ScheduleViewModel(private val repository: MatchRepository) : ViewModel() {
     }
 
     private fun recompute(error: String? = null) {
-        val zone = ZoneId.systemDefault()
-        val today = LocalDate.now(zone)
+        val today = LocalDate.now(CN_ZONE)
         val filtered = when (val f = _state.value.filter) {
             ScheduleFilter.SCHEDULED -> items.filter { it.status == f }
             ScheduleFilter.FINISHED -> items.filter { it.status == f }
             else -> items
         }
         val days = filtered
-            .groupBy { Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate() }
+            .groupBy { Instant.ofEpochMilli(it.startTime).atZone(CN_ZONE).toLocalDate() }
             .map { (date, matches) -> DayGroup(date, date == today, matches) }
             .sortedBy { it.date }
         _state.update {
@@ -117,11 +117,11 @@ class ScheduleViewModel(private val repository: MatchRepository) : ViewModel() {
 
     /** 默认窗口：过去 7 天 + 未来 14 天；左右箭头按周平移。 */
     private fun currentWindow(): Pair<Long, Long> {
-        val today = ZonedDateTime.now().toLocalDate()
+        val today = ZonedDateTime.now(CN_ZONE).toLocalDate()
         val start = today.plusDays(_state.value.weekOffset * 7L - DEFAULT_PAST_DAYS)
-            .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            .atStartOfDay(CN_ZONE).toInstant().toEpochMilli()
         val end = today.plusDays(DEFAULT_FUTURE_DAYS.toLong() + _state.value.weekOffset * 7L)
-            .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            .atStartOfDay(CN_ZONE).toInstant().toEpochMilli()
         return start to end
     }
 

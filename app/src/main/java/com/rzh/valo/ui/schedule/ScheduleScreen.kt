@@ -144,16 +144,6 @@ private fun ScheduleList(
                 MatchCard(item = match, onClick = { onOpenMatch(match.id) })
             }
         }
-
-        item(key = "footer") {
-            Text(
-                "共 ${state.totalCount} 场 · 数据来自号角 haojiao.cc",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            )
-        }
     }
 }
 

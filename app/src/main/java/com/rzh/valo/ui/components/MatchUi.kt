@@ -44,16 +44,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.rzh.valo.data.CN_ZONE
 import com.rzh.valo.data.HaojiaoApi
 import com.rzh.valo.data.MatchItem
 import com.rzh.valo.data.MatchStatus
 import com.rzh.valo.data.Participant
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 val TIME_FORMAT: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
+    DateTimeFormatter.ofPattern("HH:mm").withZone(CN_ZONE)
 
 fun formatTime(epochMillis: Long): String = TIME_FORMAT.format(Instant.ofEpochMilli(epochMillis))
 
@@ -72,27 +72,27 @@ fun Modifier.bouncyPress(interactionSource: MutableInteractionSource): Modifier 
     }
 }
 
+/** 队伍图标：不做圆形裁切，原样展示；无图时用浅色圆角块占位 */
 @Composable
 fun TeamLogo(path: String?, size: Int, modifier: Modifier = Modifier) {
     val url = HaojiaoApi.imageUrl(path)
-    Box(
-        modifier = modifier
-            .size(size.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (url != null) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(url)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(size.dp),
-            )
-        }
+    if (url != null) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(url)
+                .crossfade(true)
+                .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = modifier.size(size.dp),
+        )
+    } else {
+        Box(
+            modifier = modifier
+                .size(size.dp)
+                .clip(MaterialTheme.shapes.extraSmall)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        )
     }
 }
 

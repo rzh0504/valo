@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.ValoApplication
+import com.rzh.valo.data.CN_ZONE
 import com.rzh.valo.data.LinkInfo
 import com.rzh.valo.data.MapRoundData
 import com.rzh.valo.data.MatchItem
@@ -69,12 +70,11 @@ import com.rzh.valo.ui.components.LoadingDots
 import com.rzh.valo.ui.components.StatusPill
 import com.rzh.valo.ui.components.TeamLogo
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val FULL_TIME_FORMAT: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm", Locale.CHINA).withZone(ZoneId.systemDefault())
+    DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm", Locale.CHINA).withZone(CN_ZONE)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

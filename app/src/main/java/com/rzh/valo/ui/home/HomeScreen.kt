@@ -74,15 +74,6 @@ private fun HomeContent(state: HomeUiState, onOpenMatch: (String) -> Unit) {
         section("live", "进行中", state.live, onOpenMatch, emphasized = true)
         section("scheduled", "未开始", state.scheduled, onOpenMatch)
         section("finished", "已结束", state.finished, onOpenMatch)
-
-        item(key = "footer") {
-            Text(
-                "共 ${state.total} 场 · 数据来自号角 haojiao.cc",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-            )
-        }
     }
 }
 
