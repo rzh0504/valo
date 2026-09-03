@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">无畏契约赛程</string>
+    <string name="widget_label">无畏契约赛程</string>
+    <string name="widget_desc">浏览近期无畏契约比赛</string>
+</resources>

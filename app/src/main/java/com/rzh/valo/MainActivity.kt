@@ -1,0 +1,173 @@
+package com.rzh.valo
+
+import android.content.Intent
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Today
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Today
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.rzh.valo.data.ThemeMode
+import com.rzh.valo.ui.detail.MatchDetailScreen
+import com.rzh.valo.ui.home.HomeScreen
+import com.rzh.valo.ui.schedule.ScheduleScreen
+import com.rzh.valo.ui.settings.SettingsScreen
+import com.rzh.valo.ui.theme.ValoTheme
+
+class MainActivity : ComponentActivity() {
+
+    /** 小组件点击比赛行时携带的 match_id，导航到详情后清空 */
+    private val pendingMatchId: MutableState<String?> = mutableStateOf(null)
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        pendingMatchId.value = intent?.getStringExtra(EXTRA_MATCH_ID)
+        val app = application as ValoApplication
+        setContent {
+            val settings = app.container.settingsStore
+            val themeMode by settings.themeMode.collectAsStateWithLifecycle(ThemeMode.SYSTEM)
+            val dynamicColor by settings.dynamicColor.collectAsStateWithLifecycle(true)
+            ValoTheme(
+                darkTheme = when (themeMode) {
+                    ThemeMode.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
+                    ThemeMode.LIGHT -> false
+                    ThemeMode.DARK -> true
+                },
+                dynamicColor = dynamicColor,
+            ) {
+                AppRoot(pendingMatchId)
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.getStringExtra(EXTRA_MATCH_ID)?.let { pendingMatchId.value = it }
+    }
+
+    companion object {
+        const val EXTRA_MATCH_ID = "match_id"
+    }
+}
+
+private data class TopLevelDestination(
+    val route: String,
+    val label: String,
+    val icon: ImageVector,
+    val selectedIcon: ImageVector,
+)
+
+private val TOP_LEVEL = listOf(
+    TopLevelDestination("home", "今天", Icons.Outlined.Today, Icons.Rounded.Today),
+    TopLevelDestination("schedule", "赛程", Icons.Outlined.CalendarMonth, Icons.Rounded.CalendarMonth),
+    TopLevelDestination("settings", "设置", Icons.Outlined.Settings, Icons.Rounded.Settings),
+)
+
+@Composable
+private fun AppRoot(pendingMatchId: MutableState<String?>) {
+    val navController = rememberNavController()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+    val showBottomBar = currentRoute in TOP_LEVEL.map { it.route }
+
+    Scaffold(
+        bottomBar = {
+            if (showBottomBar) {
+                ValoNavigationBar(currentRoute) { route -> navController.goTab(route) }
+            }
+        },
+    ) { padding ->
+        NavHost(
+            navController = navController,
+            startDestination = "home",
+            modifier = Modifier.fillMaxSize().padding(padding),
+        ) {
+            composable("home") { HomeScreen(onOpenMatch = { navController.navigate("match/$it") }) }
+            composable("schedule") { ScheduleScreen(onOpenMatch = { navController.navigate("match/$it") }) }
+            composable("settings") { SettingsScreen() }
+            composable("match/{matchId}") { entry ->
+                val matchId = entry.arguments?.getString("matchId").orEmpty()
+                MatchDetailScreen(matchId = matchId, onBack = { navController.popBackStack() })
+            }
+        }
+    }
+
+    LaunchedEffect(pendingMatchId.value) {
+        pendingMatchId.value?.let {
+            navController.navigate("match/$it") { launchSingleTop = true }
+            pendingMatchId.value = null
+        }
+    }
+}
+
+@Composable
+private fun ValoNavigationBar(currentRoute: String?, onSelect: (String) -> Unit) {
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+        TOP_LEVEL.forEach { destination ->
+            val selected = currentRoute == destination.route
+            // Expressive：选中指示块带弹性动画
+            val indicatorColor by animateColorAsState(
+                targetValue = if (selected) {
+                    MaterialTheme.colorScheme.secondaryContainer
+                } else {
+                    Color.Transparent
+                },
+                animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+                label = "navIndicator",
+            )
+            NavigationBarItem(
+                selected = selected,
+                onClick = { onSelect(destination.route) },
+                icon = {
+                    Icon(
+                        if (selected) destination.selectedIcon else destination.icon,
+                        contentDescription = destination.label,
+                    )
+                },
+                label = { Text(destination.label) },
+                colors = NavigationBarItemDefaults.colors(indicatorColor = indicatorColor),
+            )
+        }
+    }
+}
+
+private fun NavHostController.goTab(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
