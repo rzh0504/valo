@@ -537,7 +537,7 @@ private fun WinIcon(mode: Int, size: Int, tint: Color = Color.White) {
                     Path().apply {
                         moveTo(w * 0.38f, h * 0.82f)
                         lineTo(w * 0.38f, h * 0.4f)
-                        quadraticBezierTo(w * 0.5f, h * 0.12f, w * 0.62f, h * 0.4f)
+                        quadraticTo(w * 0.5f, h * 0.12f, w * 0.62f, h * 0.4f)
                         lineTo(w * 0.62f, h * 0.82f)
                         close()
                     },
