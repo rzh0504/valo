@@ -37,6 +37,7 @@ import com.rzh.valo.MainActivity
 import com.rzh.valo.ValoApplication
 import com.rzh.valo.data.CN_ZONE
 import com.rzh.valo.data.MatchItem
+import com.rzh.valo.data.MATCH_LEVELS
 import com.rzh.valo.data.MatchStatus
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -57,16 +58,23 @@ object ScheduleWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val container = (context.applicationContext as ValoApplication).container
-        val (snapshot, opacity) = withContext(Dispatchers.IO) {
+        val (snapshot, settings) = withContext(Dispatchers.IO) {
             val snap = container.repository.loadSnapshot()
-            val op = container.settingsStore.widgetOpacity.first()
-            snap to op
+            val opacity = container.settingsStore.widgetOpacity.first()
+            val matchLevels = container.settingsStore.matchLevels.first()
+            snap to (opacity to matchLevels)
         }
-        provideContent { Content(snapshot?.items.orEmpty(), opacity) }
+        provideContent {
+            Content(
+                items = snapshot?.items.orEmpty(),
+                opacity = settings.first,
+                matchLevels = settings.second,
+            )
+        }
     }
 
     @Composable
-    private fun Content(items: List<MatchItem>, opacity: Float) {
+    private fun Content(items: List<MatchItem>, opacity: Float, matchLevels: Set<String>) {
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
@@ -79,7 +87,7 @@ object ScheduleWidget : GlanceAppWidget() {
                     style = TextStyle(WidgetColors.OnBackground, fontSize = 13.sp, fontWeight = FontWeight.Bold),
                 )
                 Spacer(GlanceModifier.height(6.dp))
-                val rows = widgetRows(items)
+                val rows = widgetRows(items, matchLevels)
                 if (rows.isEmpty()) {
                     Text("暂无比赛数据，打开应用刷新", style = TextStyle(WidgetColors.Secondary, fontSize = 12.sp))
                 } else {
@@ -120,14 +128,18 @@ object ScheduleWidget : GlanceAppWidget() {
         val lineText: String,
     )
 
-    private fun widgetRows(items: List<MatchItem>): List<RowModel> {
+    private fun widgetRows(items: List<MatchItem>, matchLevels: Set<String>): List<RowModel> {
         val now = System.currentTimeMillis()
-        val upcoming = items
+        val levelFiltered = items.filter { match ->
+            val level = match.level?.uppercase()
+            level !in MATCH_LEVELS || level in matchLevels
+        }
+        val upcoming = levelFiltered
             .filter { it.status == MatchStatus.LIVE || (it.status == MatchStatus.SCHEDULED && it.startTime >= now) }
             .sortedBy { it.startTime }
             .take(8)
         val selected = upcoming.ifEmpty {
-            items.filter { it.status == MatchStatus.FINISHED }.sortedByDescending { it.startTime }.take(6)
+            levelFiltered.filter { it.status == MatchStatus.FINISHED }.sortedByDescending { it.startTime }.take(6)
         }
         return selected.map { item ->
             val main = item.versus?.mainCamp?.firstOrNull()?.displayName ?: "待定"

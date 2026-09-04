@@ -1,6 +1,7 @@
 package com.rzh.valo.ui.settings
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,12 +15,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
@@ -43,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.BuildConfig
 import com.rzh.valo.ValoApplication
+import com.rzh.valo.data.MATCH_LEVELS
 import com.rzh.valo.data.ThemeMode
 import kotlin.math.roundToInt
 
@@ -56,6 +60,7 @@ fun SettingsScreen() {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
     val widgetOpacity by viewModel.widgetOpacity.collectAsStateWithLifecycle()
+    val matchLevels by viewModel.matchLevels.collectAsStateWithLifecycle()
     var opacityDraft by remember(widgetOpacity) { mutableFloatStateOf(widgetOpacity) }
 
     Column(
@@ -99,6 +104,31 @@ fun SettingsScreen() {
                     checked = dynamicColor,
                     onCheckedChange = { viewModel.setDynamicColor(it) },
                 )
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        SettingsCard(title = "赛程过滤", icon = Icons.Rounded.FilterAlt) {
+            Text("赛事级别", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "只显示选中的赛事级别；未标注级别的比赛不受影响",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                MATCH_LEVELS.forEach { level ->
+                    FilterChip(
+                        selected = level in matchLevels,
+                        onClick = { viewModel.setMatchLevel(level, level !in matchLevels) },
+                        label = { Text(level) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
 

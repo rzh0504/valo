@@ -45,7 +45,9 @@ import java.util.Locale
 @Composable
 fun HomeScreen(onOpenMatch: (String) -> Unit) {
     val app = LocalContext.current.applicationContext as ValoApplication
-    val viewModel: HomeViewModel = viewModel { HomeViewModel(app.container.repository) }
+    val viewModel: HomeViewModel = viewModel {
+        HomeViewModel(app.container.repository, app.container.settingsStore)
+    }
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     PullToRefreshBox(

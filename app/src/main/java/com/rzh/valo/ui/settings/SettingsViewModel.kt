@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rzh.valo.AppContainer
 import com.rzh.valo.data.SettingsStore
+import com.rzh.valo.data.MATCH_LEVELS
 import com.rzh.valo.data.ThemeMode
 import com.rzh.valo.widget.updateAllScheduleWidgets
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +29,9 @@ class SettingsViewModel(
     val widgetOpacity: StateFlow<Float> =
         container.settingsStore.widgetOpacity.stateIn(viewModelScope, SharingStarted.Eagerly, 1f)
 
+    val matchLevels: StateFlow<Set<String>> =
+        container.settingsStore.matchLevels.stateIn(viewModelScope, SharingStarted.Eagerly, MATCH_LEVELS.toSet())
+
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { container.settingsStore.setThemeMode(mode) }
     }
@@ -39,6 +43,15 @@ class SettingsViewModel(
     fun setWidgetOpacity(value: Float) {
         viewModelScope.launch {
             container.settingsStore.setWidgetOpacity(value)
+            withContext(Dispatchers.IO) {
+                updateAllScheduleWidgets(appContext)
+            }
+        }
+    }
+
+    fun setMatchLevel(level: String, enabled: Boolean) {
+        viewModelScope.launch {
+            container.settingsStore.setMatchLevel(level, enabled)
             withContext(Dispatchers.IO) {
                 updateAllScheduleWidgets(appContext)
             }

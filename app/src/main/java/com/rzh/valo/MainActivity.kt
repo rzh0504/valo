@@ -113,7 +113,9 @@ private fun AppRoot(pendingMatchId: MutableState<String?>) {
         NavHost(
             navController = navController,
             startDestination = "home",
-            modifier = Modifier.fillMaxSize().padding(padding),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (showBottomBar) Modifier.padding(padding) else Modifier),
         ) {
             composable("home") { HomeScreen(onOpenMatch = { navController.navigate("match/$it") }) }
             composable("schedule") { ScheduleScreen(onOpenMatch = { navController.navigate("match/$it") }) }

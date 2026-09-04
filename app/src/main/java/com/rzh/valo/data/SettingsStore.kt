@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -22,12 +23,15 @@ enum class ThemeMode(val id: Int, val label: String) {
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
+val MATCH_LEVELS = listOf("S", "A", "B", "C")
+
 /** 应用设置（DataStore 持久化） */
 class SettingsStore(private val context: Context) {
 
     private val themeKey = intPreferencesKey("theme_mode")
     private val dynamicKey = booleanPreferencesKey("dynamic_color")
     private val widgetOpacityKey = floatPreferencesKey("widget_opacity")
+    private val matchLevelsKey = stringSetPreferencesKey("match_levels")
 
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map {
         ThemeMode.from(it[themeKey] ?: ThemeMode.SYSTEM.id)
@@ -39,6 +43,11 @@ class SettingsStore(private val context: Context) {
     /** 桌面小组件背景不透明度（0.2 ~ 1.0） */
     val widgetOpacity: Flow<Float> = context.dataStore.data.map { it[widgetOpacityKey] ?: 1f }
 
+    /** 赛程中保留的赛事级别；接口未提供级别的比赛始终保留。 */
+    val matchLevels: Flow<Set<String>> = context.dataStore.data.map {
+        (it[matchLevelsKey] ?: MATCH_LEVELS.toSet()).intersect(MATCH_LEVELS.toSet())
+    }
+
     suspend fun setThemeMode(mode: ThemeMode) {
         context.dataStore.edit { it[themeKey] = mode.id }
     }
@@ -49,5 +58,14 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setWidgetOpacity(value: Float) {
         context.dataStore.edit { it[widgetOpacityKey] = value.coerceIn(0.2f, 1f) }
+    }
+
+    suspend fun setMatchLevel(level: String, enabled: Boolean) {
+        if (level !in MATCH_LEVELS) return
+        context.dataStore.edit {
+            val levels = (it[matchLevelsKey] ?: MATCH_LEVELS.toSet()).toMutableSet()
+            if (enabled) levels += level else levels -= level
+            it[matchLevelsKey] = levels
+        }
     }
 }

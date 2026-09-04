@@ -160,7 +160,11 @@ data class RoundTeam(
     @SerialName("team_icon") val icon: String? = null,
 )
 
-/** 单回合结果：win_team 1=主队 2=客队 */
+/**
+ * 单回合结果（实测语义）：win_team 1=主队 2=客队；
+ * win_camp 获胜方阵营 1=防守 2=进攻；
+ * mode 获胜方式 1=时间耗尽 2=引爆 3=歼灭 4=拆除
+ */
 @Serializable
 data class RoundEntry(
     @SerialName("win_team") val winTeam: Int = 0,

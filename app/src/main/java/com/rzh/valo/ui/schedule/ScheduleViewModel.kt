@@ -4,13 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rzh.valo.data.CN_ZONE
 import com.rzh.valo.data.MatchItem
+import com.rzh.valo.data.MATCH_LEVELS
 import com.rzh.valo.data.MatchRepository
+import com.rzh.valo.data.SettingsStore
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -48,14 +51,24 @@ data class ScheduleUiState(
         }
 }
 
-class ScheduleViewModel(private val repository: MatchRepository) : ViewModel() {
+class ScheduleViewModel(
+    private val repository: MatchRepository,
+    settingsStore: SettingsStore,
+) : ViewModel() {
 
     private val _state = MutableStateFlow(ScheduleUiState())
     val state = _state.asStateFlow()
 
     private var items: List<MatchItem> = emptyList()
+    private var matchLevels: Set<String> = MATCH_LEVELS.toSet()
 
     init {
+        viewModelScope.launch {
+            settingsStore.matchLevels.collectLatest {
+                matchLevels = it
+                recompute()
+            }
+        }
         load()
     }
 
@@ -95,10 +108,14 @@ class ScheduleViewModel(private val repository: MatchRepository) : ViewModel() {
 
     private fun recompute(error: String? = null) {
         val today = LocalDate.now(CN_ZONE)
+        val levelFiltered = items.filter { match ->
+            val level = match.level?.uppercase()
+            level !in MATCH_LEVELS || level in matchLevels
+        }
         val filtered = when (val f = _state.value.filter) {
-            ScheduleFilter.SCHEDULED -> items.filter { it.status == f }
-            ScheduleFilter.FINISHED -> items.filter { it.status == f }
-            else -> items
+            ScheduleFilter.SCHEDULED -> levelFiltered.filter { it.status == f }
+            ScheduleFilter.FINISHED -> levelFiltered.filter { it.status == f }
+            else -> levelFiltered
         }
         val days = filtered
             .groupBy { Instant.ofEpochMilli(it.startTime).atZone(CN_ZONE).toLocalDate() }

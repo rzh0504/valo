@@ -12,3 +12,8 @@ captures/
 
 # Local config
 local.properties
+
+# Release signing (do not commit)
+keystore.properties
+*.jks
+*.keystore

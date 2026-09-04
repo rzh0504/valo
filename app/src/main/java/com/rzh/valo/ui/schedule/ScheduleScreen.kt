@@ -54,7 +54,9 @@ import java.util.Locale
 @Composable
 fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
     val app = LocalContext.current.applicationContext as ValoApplication
-    val viewModel: ScheduleViewModel = viewModel { ScheduleViewModel(app.container.repository) }
+    val viewModel: ScheduleViewModel = viewModel {
+        ScheduleViewModel(app.container.repository, app.container.settingsStore)
+    }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     var scrolledToToday by rememberSaveable { mutableStateOf(false) }
