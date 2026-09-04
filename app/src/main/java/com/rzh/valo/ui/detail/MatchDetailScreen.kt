@@ -14,6 +14,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,9 +35,11 @@ import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -80,7 +83,6 @@ import com.rzh.valo.data.PlayerMatchStats
 import com.rzh.valo.data.RoundData
 import com.rzh.valo.data.RoundEntry
 import com.rzh.valo.data.RoundTeam
-import com.rzh.valo.ui.components.LoadingDots
 import com.rzh.valo.ui.components.StatusPill
 import com.rzh.valo.ui.components.TeamLogo
 import java.time.Instant
@@ -90,7 +92,7 @@ import java.util.Locale
 private val FULL_TIME_FORMAT: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm", Locale.CHINA).withZone(CN_ZONE)
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MatchDetailScreen(matchId: String, onBack: () -> Unit) {
     val app = LocalContext.current.applicationContext as ValoApplication
@@ -116,7 +118,7 @@ fun MatchDetailScreen(matchId: String, onBack: () -> Unit) {
         Box(Modifier.padding(padding).fillMaxSize()) {
             when {
                 state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    LoadingDots()
+                    LoadingIndicator()
                 }
                 state.error != null -> Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -672,7 +674,11 @@ private fun PlayerRow(player: PlayerMapStats) {
     }
 }
 
-/** 全场比赛汇总，与地图小局复用同一数据容器。 */
+/**
+ * 全场比赛汇总，与地图小局复用同一数据容器。
+ * 表格按最宽的选手 ID 撑开列宽（IntrinsicSize.Max），ID 不截断；
+ * 超出卡片宽度时可横向滚动查看全部数据列。
+ */
 @Composable
 private fun FullMatchPanel(all: List<PlayerMatchStats>, mainTeam: RoundTeam?, guestTeam: RoundTeam?) {
     val mainPlayers = all.filter { it.isMain }.sortedByDescending { it.acs ?: 0.0 }
@@ -681,12 +687,19 @@ private fun FullMatchPanel(all: List<PlayerMatchStats>, mainTeam: RoundTeam?, gu
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        Column(Modifier.padding(16.dp)) {
-            PlayerGroupHeader(mainTeam, listOf("KDA" to 72.dp, "ADR" to 42.dp, "ACS" to 42.dp))
-            mainPlayers.forEach { PlayerMatchRow(it) }
-            Spacer(Modifier.height(10.dp))
-            PlayerGroupHeader(guestTeam, listOf("KDA" to 72.dp, "ADR" to 42.dp, "ACS" to 42.dp))
-            guestPlayers.forEach { PlayerMatchRow(it) }
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .horizontalScroll(rememberScrollState()),
+        ) {
+            Column(Modifier.width(IntrinsicSize.Max)) {
+                PlayerGroupHeader(mainTeam, listOf("KDA" to 72.dp, "ADR" to 42.dp, "ACS" to 42.dp))
+                mainPlayers.forEach { PlayerMatchRow(it) }
+                Spacer(Modifier.height(10.dp))
+                PlayerGroupHeader(guestTeam, listOf("KDA" to 72.dp, "ADR" to 42.dp, "ACS" to 42.dp))
+                guestPlayers.forEach { PlayerMatchRow(it) }
+            }
         }
     }
 }

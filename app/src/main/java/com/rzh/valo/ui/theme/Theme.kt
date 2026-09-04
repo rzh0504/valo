@@ -4,7 +4,9 @@ import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
@@ -62,6 +64,7 @@ private val ExpressiveShapes = Shapes(
     extraLarge = RoundedCornerShape(40.dp),
 )
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ValoTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -70,8 +73,9 @@ fun ValoTheme(
 ) {
     val context = LocalContext.current
     val colorScheme = valoColorScheme(context, darkTheme, dynamicColor)
-    MaterialTheme(
+    MaterialExpressiveTheme(
         colorScheme = colorScheme,
+        motionScheme = MotionScheme.expressive(),
         typography = ValoTypography,
         shapes = ExpressiveShapes,
         content = content,

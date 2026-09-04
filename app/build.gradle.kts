@@ -56,14 +56,16 @@ android {
 }
 
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2025.09.01"))
+    // BOM 2026.08.00 提供 compose/foundation 1.12；material3 1.5.0 尚未 stable，
+    // Expressive 公开 API 在 1.5.0-alpha 线，显式固定覆盖 BOM 中的 1.4.0
+    implementation(platform("androidx.compose:compose-bom:2026.08.00"))
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.activity:activity-compose:1.11.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
     implementation("androidx.navigation:navigation-compose:2.9.8")
     implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material3:material3:1.5.0-alpha27")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
 
     implementation("androidx.datastore:datastore-preferences:1.2.1")

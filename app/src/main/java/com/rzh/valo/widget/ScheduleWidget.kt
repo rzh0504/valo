@@ -62,10 +62,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 /**
- * 「近期比赛」桌面小组件：展示未来几场未开赛/进行中的比赛，
- * 无未来赛程时回退展示最近已结束的比赛。每场使用独立信息卡；背景按系统
- * 深浅色模式取色，透明度可在应用设置中调节。数据来自磁盘快照，
- * 由 [WidgetRefreshWorker] 每小时刷新一次。
+ * 「近期比赛」桌面小组件：展示进行中/未开赛的比赛，开赛后即使数据源状态
+ * 尚未更新也保持展示，直到真正结束才移出；全部结束时回退展示最近完赛的比赛。
+ * 每场使用独立信息卡；背景按系统深浅色模式取色，透明度可在应用设置中调节。
+ * 数据来自磁盘快照，由 [WidgetRefreshWorker] 每小时刷新一次。
  */
 object ScheduleWidget : GlanceAppWidget() {
 
@@ -241,11 +241,13 @@ object ScheduleWidget : GlanceAppWidget() {
             val level = match.level?.uppercase()
             level !in MATCH_LEVELS || level in matchLevels
         }
-        val upcoming = levelFiltered
-            .filter { it.status == MatchStatus.LIVE || (it.status == MatchStatus.SCHEDULED && it.startTime >= now) }
+        // 按状态过滤：进行中/未开赛都保留（开赛时间已过但状态未更新也继续展示），
+        // 直到真正结束后才移出；全部结束时回退展示最近的完赛比赛。
+        val active = levelFiltered
+            .filter { it.status != MatchStatus.FINISHED }
             .sortedBy { it.startTime }
             .take(4)
-        val selected = upcoming.ifEmpty {
+        val selected = active.ifEmpty {
             levelFiltered.filter { it.status == MatchStatus.FINISHED }.sortedByDescending { it.startTime }.take(4)
         }
         return selected.map { item ->
@@ -256,7 +258,7 @@ object ScheduleWidget : GlanceAppWidget() {
             val competition = item.group?.nameSub ?: item.group?.nameMain ?: item.tournament?.nameMain.orEmpty()
             RowModel(
                 matchId = item.id,
-                timeText = formatTime(item.startTime, now),
+                timeText = if (item.status == MatchStatus.LIVE) "进行中" else formatTime(item.startTime, now),
                 competition = competition,
                 mainTeam = main,
                 guestTeam = guest,

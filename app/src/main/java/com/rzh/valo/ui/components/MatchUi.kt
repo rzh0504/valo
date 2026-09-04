@@ -27,7 +27,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -146,33 +147,7 @@ fun LiveDot(color: Color = MaterialTheme.colorScheme.primary) {
     )
 }
 
-/** Expressive 风格加载动画：三点律动 */
-@Composable
-fun LoadingDots(modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.primary) {
-    val transition = rememberInfiniteTransition(label = "dots")
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        repeat(3) { index ->
-            val dy by transition.animateFloat(
-                initialValue = 0f,
-                targetValue = -12f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(420, delayMillis = index * 130),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "dot$index",
-            )
-            Box(
-                Modifier
-                    .padding(top = 16.dp)
-                    .graphicsLayer { translationY = dy }
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(color),
-            )
-        }
-    }
-}
-
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LoadingPane(modifier: Modifier = Modifier, label: String = "正在获取赛程") {
     Column(
@@ -180,7 +155,7 @@ fun LoadingPane(modifier: Modifier = Modifier, label: String = "正在获取赛�
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        ContainedLoadingIndicator()
         Text(
             label,
             style = MaterialTheme.typography.bodyMedium,
