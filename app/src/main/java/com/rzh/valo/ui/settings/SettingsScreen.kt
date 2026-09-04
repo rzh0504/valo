@@ -1,7 +1,9 @@
 package com.rzh.valo.ui.settings
 
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,19 +14,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.FilterAlt
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MultiChoiceSegmentedButtonRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -72,9 +75,9 @@ fun SettingsScreen() {
     ) {
         Text(
             "设置",
-            style = MaterialTheme.typography.displaySmall,
+            style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 24.dp, bottom = 16.dp),
+            modifier = Modifier.padding(top = 24.dp, bottom = 24.dp),
         )
 
         SettingsCard(title = "外观", icon = Icons.Rounded.Palette) {
@@ -110,23 +113,25 @@ fun SettingsScreen() {
         Spacer(Modifier.height(14.dp))
 
         SettingsCard(title = "赛程过滤", icon = Icons.Rounded.FilterAlt) {
-            Text("赛事级别", style = MaterialTheme.typography.bodyLarge)
+            Text("赛事级别", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Text(
-                "只显示选中的赛事级别；未标注级别的比赛不受影响",
+                "可同时选择多个级别，未标注级别的比赛始终显示",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(8.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                MATCH_LEVELS.forEach { level ->
-                    FilterChip(
-                        selected = level in matchLevels,
-                        onClick = { viewModel.setMatchLevel(level, level !in matchLevels) },
+            Spacer(Modifier.height(12.dp))
+            MultiChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                MATCH_LEVELS.forEachIndexed { index, level ->
+                    SegmentedButton(
+                        checked = level in matchLevels,
+                        onCheckedChange = { viewModel.setMatchLevel(level, it) },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = MATCH_LEVELS.size),
+                        icon = {
+                            SegmentedButtonDefaults.Icon(active = level in matchLevels) {
+                                Icon(Icons.Rounded.Check, contentDescription = null)
+                            }
+                        },
                         label = { Text(level) },
-                        modifier = Modifier.weight(1f),
                     )
                 }
             }
@@ -180,16 +185,28 @@ fun SettingsScreen() {
 @Composable
 private fun SettingsCard(title: String, icon: ImageVector, content: @Composable () -> Unit) {
     Card(
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.size(8.dp))
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             }
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+            Spacer(Modifier.height(18.dp))
             content()
         }
     }
