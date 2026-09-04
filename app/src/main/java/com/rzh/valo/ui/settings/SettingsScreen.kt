@@ -185,6 +185,7 @@ fun SettingsScreen() {
 @Composable
 private fun SettingsCard(title: String, icon: ImageVector, content: @Composable () -> Unit) {
     Card(
+        modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {

@@ -33,11 +33,17 @@ class SettingsViewModel(
         container.settingsStore.matchLevels.stateIn(viewModelScope, SharingStarted.Eagerly, MATCH_LEVELS.toSet())
 
     fun setThemeMode(mode: ThemeMode) {
-        viewModelScope.launch { container.settingsStore.setThemeMode(mode) }
+        viewModelScope.launch {
+            container.settingsStore.setThemeMode(mode)
+            withContext(Dispatchers.IO) { updateAllScheduleWidgets(appContext) }
+        }
     }
 
     fun setDynamicColor(enabled: Boolean) {
-        viewModelScope.launch { container.settingsStore.setDynamicColor(enabled) }
+        viewModelScope.launch {
+            container.settingsStore.setDynamicColor(enabled)
+            withContext(Dispatchers.IO) { updateAllScheduleWidgets(appContext) }
+        }
     }
 
     fun setWidgetOpacity(value: Float) {

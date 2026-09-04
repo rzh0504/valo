@@ -6,52 +6,21 @@
     android:padding="12dp"
     android:background="@color/widget_preview_background">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="无畏契约赛程"
-            android:textColor="#F2F2F5"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="19:00 更新"
-            android:textColor="#9A9AA3"
-            android:textSize="10sp" />
-    </LinearLayout>
-
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="今天 19:00   WOL 0 : 2 KBG"
+        android:padding="12dp"
+        android:background="@color/widget_preview_card"
+        android:text="今天 19:00   太平洋联赛 · S2\nWOL              0 : 2              KBG"
         android:textColor="#F2F2F5"
         android:textSize="12sp" />
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="明天 17:00   TE vs FPX"
-        android:textColor="#F2F2F5"
-        android:textSize="12sp" />
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="周六 19:00   BLG vs EDG"
-        android:textColor="#F2F2F5"
-        android:textSize="12sp" />
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="9月17日 19:00   T1 vs GEN"
+        android:padding="12dp"
+        android:background="@color/widget_preview_card"
+        android:text="明天 17:00   全球冠军赛 · BO3\nTE                 VS                 FPX"
         android:textColor="#F2F2F5"
         android:textSize="12sp" />
 </LinearLayout>
