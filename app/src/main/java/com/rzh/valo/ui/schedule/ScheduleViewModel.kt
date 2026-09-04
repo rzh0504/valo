@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /** 状态筛选：0 全部 · 1 未开始 · 3 已结束（进行中在「全部」中可见） */
@@ -43,7 +45,7 @@ data class ScheduleUiState(
     val isDefaultWindow: Boolean get() = weekOffset == 0
     val windowLabel: String
         get() {
-            val today = LocalDate.now()
+            val today = LocalDate.now(CN_ZONE)
             val start = today.plusDays(weekOffset * 7L - ScheduleViewModel.DEFAULT_PAST_DAYS)
             val end = today.plusDays(ScheduleViewModel.DEFAULT_FUTURE_DAYS.toLong() + weekOffset * 7L)
             val fmt = java.time.format.DateTimeFormatter.ofPattern("M月d日")
@@ -61,6 +63,7 @@ class ScheduleViewModel(
 
     private var items: List<MatchItem> = emptyList()
     private var matchLevels: Set<String> = MATCH_LEVELS.toSet()
+    private var loadJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -73,13 +76,17 @@ class ScheduleViewModel(
     }
 
     fun shiftWeek(delta: Int) {
-        _state.update { it.copy(weekOffset = it.weekOffset + delta) }
+        items = emptyList()
+        _state.update {
+            it.copy(weekOffset = it.weekOffset + delta, days = emptyList(), totalCount = 0)
+        }
         load()
     }
 
     fun backToDefault() {
         if (_state.value.isDefaultWindow) return
-        _state.update { it.copy(weekOffset = 0) }
+        items = emptyList()
+        _state.update { it.copy(weekOffset = 0, days = emptyList(), totalCount = 0) }
         load()
     }
 
@@ -91,22 +98,35 @@ class ScheduleViewModel(
     }
 
     private fun load(force: Boolean = false) {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        val requestedOffset = _state.value.weekOffset
+        loadJob = viewModelScope.launch {
             _state.update { it.copy(loading = it.days.isEmpty(), refreshing = force, error = null) }
             try {
-                val (start, end) = currentWindow()
+                val (start, end) = currentWindow(requestedOffset)
+                if (!force && requestedOffset == 0 && items.isEmpty()) {
+                    repository.cachedSchedule(start, end).takeIf { it.isNotEmpty() }?.let { cached ->
+                        items = cached
+                        recompute()
+                        _state.update { it.copy(loading = false, refreshing = true) }
+                    }
+                }
                 val list = repository.schedule(start, end, force)
+                if (_state.value.weekOffset != requestedOffset) return@launch
                 items = list
                 // 仅默认窗口写快照，小组件始终消费"近期"数据
-                if (_state.value.isDefaultWindow) repository.saveSnapshot(list)
+                if (requestedOffset == 0) repository.saveSnapshot(list)
                 recompute()
+                _state.update { it.copy(loading = false, refreshing = false, error = null) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                recompute(error = "网络请求失败，请下拉重试")
+                _state.update { it.copy(loading = false, refreshing = false, error = "网络请求失败，请下拉重试") }
             }
         }
     }
 
-    private fun recompute(error: String? = null) {
+    private fun recompute() {
         val today = LocalDate.now(CN_ZONE)
         val levelFiltered = items.filter { match ->
             val level = match.level?.uppercase()
@@ -123,9 +143,6 @@ class ScheduleViewModel(
             .sortedBy { it.date }
         _state.update {
             it.copy(
-                loading = false,
-                refreshing = false,
-                error = error,
                 days = days,
                 totalCount = filtered.size,
             )
@@ -133,11 +150,11 @@ class ScheduleViewModel(
     }
 
     /** 默认窗口：过去 7 天 + 未来 14 天；左右箭头按周平移。 */
-    private fun currentWindow(): Pair<Long, Long> {
+    private fun currentWindow(weekOffset: Int): Pair<Long, Long> {
         val today = ZonedDateTime.now(CN_ZONE).toLocalDate()
-        val start = today.plusDays(_state.value.weekOffset * 7L - DEFAULT_PAST_DAYS)
+        val start = today.plusDays(weekOffset * 7L - DEFAULT_PAST_DAYS)
             .atStartOfDay(CN_ZONE).toInstant().toEpochMilli()
-        val end = today.plusDays(DEFAULT_FUTURE_DAYS.toLong() + _state.value.weekOffset * 7L)
+        val end = today.plusDays(DEFAULT_FUTURE_DAYS.toLong() + weekOffset * 7L)
             .atStartOfDay(CN_ZONE).toInstant().toEpochMilli()
         return start to end
     }

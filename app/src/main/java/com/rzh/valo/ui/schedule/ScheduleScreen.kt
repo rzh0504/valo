@@ -44,7 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.ValoApplication
-import com.rzh.valo.ui.components.LoadingDots
+import com.rzh.valo.ui.components.LoadingPane
+import com.rzh.valo.data.CN_ZONE
 import com.rzh.valo.ui.components.MatchCard
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -65,7 +66,7 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
         if (!scrolledToToday && state.days.isNotEmpty()) {
             val index = state.days.indexOfFirst { it.isToday }
             val target = if (index >= 0) index else {
-                state.days.indexOfFirst { !it.date.isBefore(LocalDate.now()) }
+                state.days.indexOfFirst { !it.date.isBefore(LocalDate.now(CN_ZONE)) }
             }
             if (target > 0) {
                 listState.scrollToItem(headerOffset(state, target))
@@ -81,7 +82,7 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
     ) {
         when {
             state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                LoadingDots()
+                LoadingPane(label = "正在整理赛程")
             }
             state.error != null && state.days.isEmpty() -> ErrorPane(
                 message = state.error!!,
@@ -104,8 +105,8 @@ private fun ScheduleList(
 ) {
     LazyColumn(
         state = listState,
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
         item(key = "header") { ScheduleHeader(state, viewModel) }
@@ -152,11 +153,10 @@ private fun ScheduleList(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ScheduleHeader(state: ScheduleUiState, viewModel: ScheduleViewModel) {
-    Column(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 12.dp)) {
         Text(
             "赛程",
             style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -173,7 +173,7 @@ private fun ScheduleHeader(state: ScheduleUiState, viewModel: ScheduleViewModel)
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "下一周")
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
                 val options = listOf(

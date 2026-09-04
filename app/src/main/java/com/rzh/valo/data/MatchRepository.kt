@@ -84,6 +84,25 @@ class MatchRepository(
 
     fun loadSnapshot(): SnapshotStore.Snapshot? = store.load()
 
+    /** 冷启动时从磁盘快照中恢复指定时间窗，网络请求随后负责更新数据。 */
+    suspend fun cachedSchedule(startTime: Long, endTime: Long): List<MatchItem> =
+        withContext(Dispatchers.IO) {
+            val snapshot = store.load() ?: return@withContext emptyList()
+            if (System.currentTimeMillis() - snapshot.fetchedAt > SNAPSHOT_TTL) return@withContext emptyList()
+            snapshot.items.filter { it.startTime in startTime until endTime }.sortedBy { it.startTime }
+        }
+
+    suspend fun cachedHomeSchedule(startTime: Long, endTime: Long): List<MatchItem> =
+        withContext(Dispatchers.IO) {
+            val snapshot = store.load() ?: return@withContext emptyList()
+            if (System.currentTimeMillis() - snapshot.homeFetchedAt > SNAPSHOT_TTL) return@withContext emptyList()
+            snapshot.homeItems.filter { it.startTime in startTime until endTime }.sortedBy { it.startTime }
+        }
+
+    suspend fun saveHomeSnapshot(items: List<MatchItem>) = withContext(Dispatchers.IO) {
+        store.saveHome(items)
+    }
+
     /** 小组件刷新窗口：近 36 小时 + 未来 7 天。 */
     fun widgetWindow(): Pair<Long, Long> {
         val now = System.currentTimeMillis()
@@ -124,6 +143,7 @@ class MatchRepository(
         private const val DAY = 24 * HOUR
         private const val WINDOW_TTL = 5 * 60_000L
         private const val DETAIL_TTL = 15 * 60_000L
+        private const val SNAPSHOT_TTL = 24 * 60 * 60_000L
         private const val PAGE_SIZE = 100
         private const val MAX_PAGES = 3
         private const val SORT_ASC = 1

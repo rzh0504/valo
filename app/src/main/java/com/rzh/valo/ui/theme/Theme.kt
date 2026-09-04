@@ -22,6 +22,16 @@ private val LightColors = lightColorScheme(
     onPrimaryContainer = BrandOnPrimaryContainer,
     secondaryContainer = BrandSecondaryContainer,
     onSecondaryContainer = BrandOnSecondaryContainer,
+    secondary = BrandSecondary,
+    onSecondary = BrandOnSecondary,
+    tertiary = BrandTertiary,
+    onTertiary = BrandOnTertiary,
+    tertiaryContainer = BrandTertiaryContainer,
+    onTertiaryContainer = BrandOnTertiaryContainer,
+    surface = BrandSurface,
+    surfaceVariant = BrandSurfaceVariant,
+    outline = BrandOutline,
+    outlineVariant = BrandOutlineVariant,
 )
 
 private val DarkColors = darkColorScheme(
@@ -31,6 +41,16 @@ private val DarkColors = darkColorScheme(
     onPrimaryContainer = BrandOnPrimaryContainerDark,
     secondaryContainer = BrandSecondaryContainerDark,
     onSecondaryContainer = BrandOnSecondaryContainerDark,
+    secondary = BrandSecondaryDark,
+    onSecondary = BrandOnSecondaryDark,
+    tertiary = BrandTertiaryDark,
+    onTertiary = BrandOnTertiaryDark,
+    tertiaryContainer = BrandTertiaryContainerDark,
+    onTertiaryContainer = BrandOnTertiaryContainerDark,
+    surface = BrandSurfaceDark,
+    surfaceVariant = BrandSurfaceVariantDark,
+    outline = BrandOutlineDark,
+    outlineVariant = BrandOutlineVariantDark,
 )
 
 /** Expressive：明显更圆润的形状层级 */
@@ -52,6 +72,7 @@ fun ValoTheme(
     val colorScheme = valoColorScheme(context, darkTheme, dynamicColor)
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = ValoTypography,
         shapes = ExpressiveShapes,
         content = content,
     )

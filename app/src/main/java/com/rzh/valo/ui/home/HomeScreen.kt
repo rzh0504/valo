@@ -35,7 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.ValoApplication
 import com.rzh.valo.data.MatchStatus
-import com.rzh.valo.ui.components.LoadingDots
+import com.rzh.valo.ui.components.LoadingPane
 import com.rzh.valo.ui.components.MatchCard
 import com.rzh.valo.ui.components.bouncyPress
 import java.time.format.DateTimeFormatter
@@ -57,7 +57,7 @@ fun HomeScreen(onOpenMatch: (String) -> Unit) {
     ) {
         when {
             state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                LoadingDots()
+                LoadingPane()
             }
             state.error != null && !state.hasMatches -> HomeError(state.error!!, onRetry = { viewModel.refresh() })
             else -> HomeContent(state, viewModel, onOpenMatch)
@@ -68,8 +68,8 @@ fun HomeScreen(onOpenMatch: (String) -> Unit) {
 @Composable
 private fun HomeContent(state: HomeUiState, viewModel: HomeViewModel, onOpenMatch: (String) -> Unit) {
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
         item(key = "hero") { HeroHeader(state, viewModel) }
@@ -128,7 +128,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.section(
 
 @Composable
 private fun HeroHeader(state: HomeUiState, viewModel: HomeViewModel) {
-    Column(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 12.dp)) {
         Text(
             "今天",
             style = MaterialTheme.typography.labelLarge,
@@ -138,7 +138,6 @@ private fun HeroHeader(state: HomeUiState, viewModel: HomeViewModel) {
         Text(
             dateText,
             style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -169,7 +168,7 @@ private fun HeroHeader(state: HomeUiState, viewModel: HomeViewModel) {
 private fun SummaryChip(label: String, count: Int, selected: Boolean, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     Surface(
-        shape = MaterialTheme.shapes.small,
+            shape = MaterialTheme.shapes.large,
         color = if (selected) {
             MaterialTheme.colorScheme.primary
         } else {
@@ -218,7 +217,7 @@ private fun EmptyToday() {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 80.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 96.dp),
     ) {
         Text(
             "今天没有比赛",
@@ -227,7 +226,7 @@ private fun EmptyToday() {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            "去「赛程」看看近期其他比赛吧",
+            "近期比赛会显示在赛程中",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

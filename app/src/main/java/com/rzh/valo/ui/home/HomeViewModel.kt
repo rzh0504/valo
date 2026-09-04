@@ -19,7 +19,7 @@ data class HomeUiState(
     val loading: Boolean = true,
     val refreshing: Boolean = false,
     val error: String? = null,
-    val date: LocalDate = LocalDate.now(),
+    val date: LocalDate = LocalDate.now(CN_ZONE),
     val live: List<MatchItem> = emptyList(),
     val scheduled: List<MatchItem> = emptyList(),
     val finished: List<MatchItem> = emptyList(),
@@ -64,8 +64,17 @@ class HomeViewModel(
                 val today = LocalDate.now(CN_ZONE)
                 val start = today.atStartOfDay(CN_ZONE).toInstant().toEpochMilli()
                 val end = today.plusDays(1).atStartOfDay(CN_ZONE).toInstant().toEpochMilli()
+                if (!force && items.isEmpty()) {
+                    repository.cachedHomeSchedule(start, end).takeIf { it.isNotEmpty() }?.let { cached ->
+                        items = cached
+                        recompute(today)
+                        _state.update { it.copy(loading = false, refreshing = true) }
+                    }
+                }
                 items = repository.schedule(start, end, force)
+                repository.saveHomeSnapshot(items)
                 recompute(today)
+                _state.update { it.copy(loading = false, refreshing = false, error = null) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, refreshing = false, error = "网络请求失败，请下拉重试") }
             }
@@ -79,9 +88,6 @@ class HomeViewModel(
         }
         _state.update {
             it.copy(
-                loading = false,
-                refreshing = false,
-                error = null,
                 date = date,
                 live = filtered.filter { m -> m.status == MatchStatus.LIVE }.sortedBy { m -> m.startTime },
                 scheduled = filtered.filter { m -> m.status == MatchStatus.SCHEDULED }.sortedBy { m -> m.startTime },

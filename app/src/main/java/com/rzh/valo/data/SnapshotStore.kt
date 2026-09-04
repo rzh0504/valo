@@ -13,16 +13,46 @@ import kotlinx.serialization.json.Json
 class SnapshotStore(context: Context) {
 
     @Serializable
-    data class Snapshot(val fetchedAt: Long = 0L, val items: List<MatchItem> = emptyList())
+    data class Snapshot(
+        val fetchedAt: Long = 0L,
+        val items: List<MatchItem> = emptyList(),
+        val homeFetchedAt: Long = 0L,
+        val homeItems: List<MatchItem> = emptyList(),
+    )
 
     private val json = Json { ignoreUnknownKeys = true }
     private val file = File(context.filesDir, "schedule_snapshot.json")
 
     @Synchronized
     fun save(items: List<MatchItem>) {
+        val previous = load()
+        write(
+            Snapshot(
+                fetchedAt = System.currentTimeMillis(),
+                items = items,
+                homeFetchedAt = previous?.homeFetchedAt ?: 0L,
+                homeItems = previous?.homeItems.orEmpty(),
+            )
+        )
+    }
+
+    @Synchronized
+    fun saveHome(items: List<MatchItem>) {
+        val previous = load()
+        write(
+            Snapshot(
+                fetchedAt = previous?.fetchedAt ?: 0L,
+                items = previous?.items.orEmpty(),
+                homeFetchedAt = System.currentTimeMillis(),
+                homeItems = items,
+            )
+        )
+    }
+
+    private fun write(snapshot: Snapshot) {
         runCatching {
             val tmp = File(file.parentFile, file.name + ".tmp")
-            tmp.writeText(json.encodeToString(Snapshot(System.currentTimeMillis(), items)))
+            tmp.writeText(json.encodeToString(snapshot))
             if (!tmp.renameTo(file)) {
                 file.writeText(tmp.readText())
                 tmp.delete()

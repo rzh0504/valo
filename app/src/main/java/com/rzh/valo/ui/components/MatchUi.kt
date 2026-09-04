@@ -27,6 +27,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -173,6 +174,22 @@ fun LoadingDots(modifier: Modifier = Modifier, color: Color = MaterialTheme.colo
 }
 
 @Composable
+fun LoadingPane(modifier: Modifier = Modifier, label: String = "正在获取赛程") {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 fun MatchCard(item: MatchItem, onClick: () -> Unit, emphasized: Boolean = false) {
     val versus = item.versus
     val main = versus?.mainCamp?.firstOrNull()
@@ -191,6 +208,7 @@ fun MatchCard(item: MatchItem, onClick: () -> Unit, emphasized: Boolean = false)
         shape = MaterialTheme.shapes.medium,
         interactionSource = interaction,
         colors = CardDefaults.cardColors(containerColor = container),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.bouncyPress(interaction),
     ) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {

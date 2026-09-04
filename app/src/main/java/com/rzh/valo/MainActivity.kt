@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -31,6 +32,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -104,6 +107,7 @@ private fun AppRoot(pendingMatchId: MutableState<String?>) {
     val showBottomBar = currentRoute in TOP_LEVEL.map { it.route }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         bottomBar = {
             if (showBottomBar) {
                 ValoNavigationBar(currentRoute) { route -> navController.goTab(route) }
@@ -137,7 +141,10 @@ private fun AppRoot(pendingMatchId: MutableState<String?>) {
 
 @Composable
 private fun ValoNavigationBar(currentRoute: String?, onSelect: (String) -> Unit) {
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 0.dp,
+    ) {
         TOP_LEVEL.forEach { destination ->
             val selected = currentRoute == destination.route
             // Expressive：选中指示块带弹性动画
@@ -150,6 +157,11 @@ private fun ValoNavigationBar(currentRoute: String?, onSelect: (String) -> Unit)
                 animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
                 label = "navIndicator",
             )
+            val iconScale by animateFloatAsState(
+                targetValue = if (selected) 1.12f else 1f,
+                animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
+                label = "navIconScale",
+            )
             NavigationBarItem(
                 selected = selected,
                 onClick = { onSelect(destination.route) },
@@ -157,6 +169,7 @@ private fun ValoNavigationBar(currentRoute: String?, onSelect: (String) -> Unit)
                     Icon(
                         if (selected) destination.selectedIcon else destination.icon,
                         contentDescription = destination.label,
+                        modifier = Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale },
                     )
                 },
                 label = { Text(destination.label) },
