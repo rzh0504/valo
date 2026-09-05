@@ -119,7 +119,9 @@ private fun AppRoot(pendingMatchId: MutableState<String?>) {
             startDestination = "home",
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (showBottomBar) Modifier.padding(padding) else Modifier),
+                // 只吃底部导航高度：Scaffold 默认会把状态栏 inset 塞进 top padding，
+                // 与各页面自己的 statusBarsPadding 叠加出双倍空白，故顶部由页面自理
+                .then(if (showBottomBar) Modifier.padding(bottom = padding.calculateBottomPadding()) else Modifier),
         ) {
             composable("home") { HomeScreen(onOpenMatch = { navController.navigate("match/$it") }) }
             composable("schedule") { ScheduleScreen(onOpenMatch = { navController.navigate("match/$it") }) }

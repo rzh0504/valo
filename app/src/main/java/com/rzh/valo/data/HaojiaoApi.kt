@@ -99,6 +99,14 @@ class HaojiaoApi {
         return exec(Request.Builder().url(url).build())
     }
 
+    /** 前瞻 · 近期大赛表现：双方各自的近 5 场大型赛事与胜负统计（已结束/未开始的比赛均可查） */
+    fun recentBigMatch(matchId: String): RecentBigMatchData {
+        val url = "$BASE/wiki/api/v1/foresight/recent_big_match".toHttpUrl().newBuilder()
+            .addQueryParameter("match_id", matchId)
+            .build()
+        return exec(Request.Builder().url(url).build())
+    }
+
     private inline fun <reified T> exec(request: Request): T {
         client.newCall(request).execute().use { response ->
             val text = response.body?.string().orEmpty()

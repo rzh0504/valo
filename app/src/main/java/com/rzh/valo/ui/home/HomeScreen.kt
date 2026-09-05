@@ -81,7 +81,7 @@ fun HomeScreen(onOpenMatch: (String) -> Unit) {
 @Composable
 private fun HomeContent(state: HomeUiState, viewModel: HomeViewModel, onOpenMatch: (String) -> Unit) {
     LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 32.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -141,7 +141,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.section(
 
 @Composable
 private fun HeroHeader(state: HomeUiState, viewModel: HomeViewModel) {
-    Column(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 12.dp)) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp)) {
         Text(
             "今天",
             style = MaterialTheme.typography.labelLarge,

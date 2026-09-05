@@ -35,6 +35,23 @@ data class MatchListData(val count: Int = 0, val list: List<MatchItem> = emptyLi
 @Serializable
 data class BattleDetailData(val match: MatchItem? = null)
 
+/** 前瞻 · 近期大赛表现（foresight/recent_big_match，元素结构与比赛列表项一致） */
+@Serializable
+data class RecentBigMatchData(
+    @SerialName("main_score_count") val mainScoreCount: TeamRecentSummary? = null,
+    @SerialName("guest_score_count") val guestScoreCount: TeamRecentSummary? = null,
+    @SerialName("main_team_match") val mainTeamMatch: List<MatchItem> = emptyList(),
+    @SerialName("guest_team_match") val guestTeamMatch: List<MatchItem> = emptyList(),
+)
+
+@Serializable
+data class TeamRecentSummary(
+    @SerialName("match_total_count") val total: Int = 0,
+    @SerialName("match_win_count") val win: Int = 0,
+    @SerialName("match_win_rate") val winRate: Double = 0.0,
+    @SerialName("match_lose_count") val lose: Int = 0,
+)
+
 /** 比赛（列表项与详情共用，unknown 字段一律忽略） */
 @Serializable
 data class MatchItem(

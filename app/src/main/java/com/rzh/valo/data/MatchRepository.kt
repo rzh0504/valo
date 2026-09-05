@@ -21,9 +21,11 @@ class MatchRepository(
     private val windowCache = ConcurrentHashMap<Pair<Long, Long>, Entry>()
     private val detailCache = ConcurrentHashMap<String, Entry>()
     private val roundCache = ConcurrentHashMap<String, Entry>()
+    private val recentCache = ConcurrentHashMap<String, Entry>()
     private val windowMutex = Mutex()
     private val detailMutex = Mutex()
     private val roundMutex = Mutex()
+    private val recentMutex = Mutex()
 
     /**
      * 拉取 [startTime, endTime) 时间窗内的比赛（升序）。
@@ -74,6 +76,22 @@ class MatchRepository(
                 } else {
                     val data = api.roundData(matchId)
                     roundCache[matchId] = Entry(data, now)
+                    data
+                }
+            }
+        }
+
+    /** 双方近期大赛表现（前瞻数据），单条缓存 [DETAIL_TTL]。 */
+    suspend fun matchRecent(matchId: String, force: Boolean = false): RecentBigMatchData =
+        withContext(Dispatchers.IO) {
+            recentMutex.withLock {
+                val cached = recentCache[matchId]
+                val now = System.currentTimeMillis()
+                if (!force && cached != null && now - cached.fetchedAt < DETAIL_TTL) {
+                    cached.data as RecentBigMatchData
+                } else {
+                    val data = api.recentBigMatch(matchId)
+                    recentCache[matchId] = Entry(data, now)
                     data
                 }
             }

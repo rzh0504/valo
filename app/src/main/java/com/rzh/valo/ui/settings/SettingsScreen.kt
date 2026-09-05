@@ -77,7 +77,7 @@ fun SettingsScreen() {
             "设置",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 24.dp, bottom = 24.dp),
+            modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
         )
 
         SettingsCard(title = "外观", icon = Icons.Rounded.Palette) {

@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -41,6 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,10 +52,13 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -86,6 +91,7 @@ import com.rzh.valo.data.PlayerMatchStats
 import com.rzh.valo.data.RoundData
 import com.rzh.valo.data.RoundEntry
 import com.rzh.valo.data.RoundTeam
+import com.rzh.valo.ui.components.LoadingPane
 import com.rzh.valo.ui.components.StatusPill
 import com.rzh.valo.ui.components.TeamLogo
 import java.time.Instant
@@ -95,12 +101,21 @@ import java.util.Locale
 private val FULL_TIME_FORMAT: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm", Locale.CHINA).withZone(CN_ZONE)
 
+private val SHORT_DATE_FORMAT: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("M月d日", Locale.CHINA).withZone(CN_ZONE)
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MatchDetailScreen(matchId: String, onBack: () -> Unit) {
     val app = LocalContext.current.applicationContext as ValoApplication
     val viewModel: MatchDetailViewModel = viewModel { MatchDetailViewModel(app.container.repository, matchId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val teamRecent by viewModel.teamRecent.collectAsStateWithLifecycle()
+    var teamSheet by remember { mutableStateOf<Participant?>(null) }
+
+    LaunchedEffect(teamSheet) {
+        teamSheet?.let { viewModel.loadTeamRecent(it) }
+    }
 
     Scaffold(
         topBar = {
@@ -148,16 +163,28 @@ fun MatchDetailScreen(matchId: String, onBack: () -> Unit) {
                             )
                         },
                     ) {
-                        DetailContent(item, state.round)
+                        DetailContent(item, state.round, onTeamClick = { teamSheet = it })
                     }
                 }
             }
         }
     }
+
+    teamSheet?.let { team ->
+        ModalBottomSheet(
+            onDismissRequest = {
+                teamSheet = null
+                viewModel.dismissTeamRecent()
+            },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            TeamRecentSheet(team, teamRecent)
+        }
+    }
 }
 
 @Composable
-private fun DetailContent(item: MatchItem, round: RoundData) {
+private fun DetailContent(item: MatchItem, round: RoundData, onTeamClick: (Participant) -> Unit) {
     val versus = item.versus
     val main = versus?.mainCamp?.firstOrNull()
     val guest = versus?.guestCamp?.firstOrNull()
@@ -185,9 +212,19 @@ private fun DetailContent(item: MatchItem, round: RoundData) {
         Spacer(Modifier.height(20.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            TeamBlock(main, winner = item.isFinished && versus?.isMainWin == 1, modifier = Modifier.weight(1f))
+            TeamBlock(
+                main,
+                winner = item.isFinished && versus?.isMainWin == 1,
+                modifier = Modifier.weight(1f),
+                onLogoClick = { main?.let(onTeamClick) },
+            )
             ScoreBlock(item, modifier = Modifier.width(120.dp))
-            TeamBlock(guest, winner = item.isFinished && versus?.isMainWin == 2, modifier = Modifier.weight(1f))
+            TeamBlock(
+                guest,
+                winner = item.isFinished && versus?.isMainWin == 2,
+                modifier = Modifier.weight(1f),
+                onLogoClick = { guest?.let(onTeamClick) },
+            )
         }
 
         Spacer(Modifier.height(20.dp))
@@ -788,13 +825,31 @@ private fun PlayerMatchRow(player: PlayerMatchStats) {
 // ---------- 通用块 ----------
 
 @Composable
-private fun TeamBlock(participant: Participant?, winner: Boolean, modifier: Modifier = Modifier) {
+private fun TeamBlock(
+    participant: Participant?,
+    winner: Boolean,
+    modifier: Modifier = Modifier,
+    onLogoClick: (() -> Unit)? = null,
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = modifier,
     ) {
-        TeamLogo(participant?.icon, size = 60)
+        Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .then(
+                    if (participant != null && onLogoClick != null) {
+                        Modifier.clickable(onClick = onLogoClick)
+                    } else {
+                        Modifier
+                    }
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            TeamLogo(participant?.icon, size = 60)
+        }
         Spacer(Modifier.height(8.dp))
         Text(
             participant?.nameMain ?: "待定",
@@ -883,5 +938,132 @@ private fun LinkPill(link: LinkInfo) {
                 modifier = Modifier.size(12.dp),
             )
         }
+    }
+}
+
+// ---------- 战队近期战绩 sheet ----------
+
+/** 点击战队徽标弹出：近期大赛表现（胜负统计 + 已结束/进行中的比赛），未开始的不显示 */
+@Composable
+private fun TeamRecentSheet(team: Participant, state: TeamRecentUiState?) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+        ) {
+            TeamLogo(team.icon, size = 40)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    team.nameMain?.takeIf { it.isNotBlank() } ?: team.displayName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                val summaryText = state?.summary
+                    ?.takeIf { it.total > 0 }
+                    ?.let { "近${it.total}场 ${it.win}胜 ${it.lose}负" }
+                    ?: "近期大赛表现"
+                Text(
+                    summaryText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        when {
+            state == null || state.loading -> LoadingPane(label = "正在获取近期战绩")
+            state.failed -> Text(
+                "获取战绩失败，请稍后重试",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+            )
+            state.matches.isEmpty() -> Text(
+                "近期没有已结束的比赛",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+            )
+            else -> Column {
+                state.matches.forEach { match -> TeamRecentRow(team, match) }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+@Composable
+private fun TeamRecentRow(team: Participant, match: MatchItem) {
+    val versus = match.versus ?: return
+    val side = teamSide(versus, team)
+    if (side == 0) return
+    val teamScore = if (side == 1) versus.mainScore else versus.guestScore
+    val oppScore = if (side == 1) versus.guestScore else versus.mainScore
+    val won = versus.isMainWin == side
+    val opponent = (if (side == 1) versus.guestCamp else versus.mainCamp)?.firstOrNull()
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+    ) {
+        Text(
+            SHORT_DATE_FORMAT.format(Instant.ofEpochMilli(match.startTime)),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(52.dp),
+        )
+        TeamLogo(opponent?.icon, size = 22)
+        Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                opponent?.displayName ?: "待定",
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                match.group?.nameMain ?: match.tournament?.nameMain.orEmpty(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            "${teamScore ?: "0"} : ${oppScore ?: "0"}",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = if (won) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.width(10.dp))
+        if (match.isFinished) ResultPill(won) else StatusPill(match.status)
+    }
+}
+
+/** 胜负结果胶囊：胜用主色容器，负用中性灰 */
+@Composable
+private fun ResultPill(won: Boolean) {
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = if (won) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+        contentColor = if (won) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+    ) {
+        Text(
+            if (won) "胜" else "负",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+        )
     }
 }

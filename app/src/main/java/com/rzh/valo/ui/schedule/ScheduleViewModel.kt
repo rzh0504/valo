@@ -40,15 +40,30 @@ data class ScheduleUiState(
     val totalCount: Int = 0,
     /** 相对默认窗口偏移的周数 */
     val weekOffset: Int = 0,
+    /** 日期选择器选定的自定义区间（含两端）；非空时优先于周平移 */
+    val customStart: LocalDate? = null,
+    val customEnd: LocalDate? = null,
     val filter: Int = ScheduleFilter.ALL,
 ) {
-    val isDefaultWindow: Boolean get() = weekOffset == 0
+    val isDefaultWindow: Boolean get() = weekOffset == 0 && customStart == null
+
+    /** 自定义区间下周平移无意义 */
+    val canShiftWeek: Boolean get() = customStart == null
+
     val windowLabel: String
         get() {
+            val fmt = java.time.format.DateTimeFormatter.ofPattern("M月d日")
+            if (customStart != null) {
+                val end = customEnd ?: customStart
+                return if (end == customStart) {
+                    customStart.format(fmt)
+                } else {
+                    "${customStart.format(fmt)} – ${end.format(fmt)}"
+                }
+            }
             val today = LocalDate.now(CN_ZONE)
             val start = today.plusDays(weekOffset * 7L - ScheduleViewModel.DEFAULT_PAST_DAYS)
             val end = today.plusDays(ScheduleViewModel.DEFAULT_FUTURE_DAYS.toLong() + weekOffset * 7L)
-            val fmt = java.time.format.DateTimeFormatter.ofPattern("M月d日")
             return "${start.format(fmt)} – ${end.format(fmt)}"
         }
 }
@@ -76,6 +91,7 @@ class ScheduleViewModel(
     }
 
     fun shiftWeek(delta: Int) {
+        if (!_state.value.canShiftWeek) return
         items = emptyList()
         _state.update {
             it.copy(weekOffset = it.weekOffset + delta, days = emptyList(), totalCount = 0)
@@ -86,7 +102,18 @@ class ScheduleViewModel(
     fun backToDefault() {
         if (_state.value.isDefaultWindow) return
         items = emptyList()
-        _state.update { it.copy(weekOffset = 0, days = emptyList(), totalCount = 0) }
+        _state.update {
+            it.copy(weekOffset = 0, customStart = null, customEnd = null, days = emptyList(), totalCount = 0)
+        }
+        load()
+    }
+
+    /** 日期选择器确认：查询 [start, end]（含两端）内的比赛；单日则 start == end */
+    fun setCustomRange(start: LocalDate, end: LocalDate) {
+        items = emptyList()
+        _state.update {
+            it.copy(customStart = start, customEnd = end, weekOffset = 0, days = emptyList(), totalCount = 0)
+        }
         load()
     }
 
@@ -100,11 +127,14 @@ class ScheduleViewModel(
     private fun load(force: Boolean = false) {
         loadJob?.cancel()
         val requestedOffset = _state.value.weekOffset
+        val requestedCustomStart = _state.value.customStart
+        val requestedCustomEnd = _state.value.customEnd
+        val isDefaultWindow = requestedOffset == 0 && requestedCustomStart == null
         loadJob = viewModelScope.launch {
             _state.update { it.copy(loading = it.days.isEmpty(), refreshing = force, error = null) }
             try {
-                val (start, end) = currentWindow(requestedOffset)
-                if (!force && requestedOffset == 0 && items.isEmpty()) {
+                val (start, end) = currentWindow(requestedOffset, requestedCustomStart, requestedCustomEnd)
+                if (!force && isDefaultWindow && items.isEmpty()) {
                     repository.cachedSchedule(start, end).takeIf { it.isNotEmpty() }?.let { cached ->
                         items = cached
                         recompute()
@@ -112,10 +142,15 @@ class ScheduleViewModel(
                     }
                 }
                 val list = repository.schedule(start, end, force)
-                if (_state.value.weekOffset != requestedOffset) return@launch
+                if (_state.value.weekOffset != requestedOffset ||
+                    _state.value.customStart != requestedCustomStart ||
+                    _state.value.customEnd != requestedCustomEnd
+                ) {
+                    return@launch
+                }
                 items = list
                 // 仅默认窗口写快照，小组件始终消费"近期"数据
-                if (requestedOffset == 0) repository.saveSnapshot(list)
+                if (isDefaultWindow) repository.saveSnapshot(list)
                 recompute()
                 _state.update { it.copy(loading = false, refreshing = false, error = null) }
             } catch (e: CancellationException) {
@@ -149,8 +184,17 @@ class ScheduleViewModel(
         }
     }
 
-    /** 默认窗口：过去 7 天 + 未来 14 天；左右箭头按周平移。 */
-    private fun currentWindow(weekOffset: Int): Pair<Long, Long> {
+    /** 默认窗口：过去 7 天 + 未来 14 天；左右箭头按周平移。自定义区间优先（含两端，end 换算为次日零点的左闭右开）。 */
+    private fun currentWindow(
+        weekOffset: Int,
+        customStart: LocalDate?,
+        customEnd: LocalDate?,
+    ): Pair<Long, Long> {
+        if (customStart != null) {
+            val end = (customEnd ?: customStart).plusDays(1)
+            return customStart.atStartOfDay(CN_ZONE).toInstant().toEpochMilli() to
+                end.atStartOfDay(CN_ZONE).toInstant().toEpochMilli()
+        }
         val today = ZonedDateTime.now(CN_ZONE).toLocalDate()
         val start = today.plusDays(weekOffset * 7L - DEFAULT_PAST_DAYS)
             .atStartOfDay(CN_ZONE).toInstant().toEpochMilli()

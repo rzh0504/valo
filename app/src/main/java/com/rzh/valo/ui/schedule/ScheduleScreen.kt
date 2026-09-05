@@ -1,5 +1,6 @@
 package com.rzh.valo.ui.schedule
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +10,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,6 +22,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DateRangePicker
+import androidx.compose.material3.DateRangePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -36,10 +43,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -50,7 +59,9 @@ import com.rzh.valo.ValoApplication
 import com.rzh.valo.ui.components.LoadingPane
 import com.rzh.valo.data.CN_ZONE
 import com.rzh.valo.ui.components.MatchCard
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -64,6 +75,7 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     var scrolledToToday by rememberSaveable { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.days) {
         if (!scrolledToToday && state.days.isNotEmpty()) {
@@ -101,8 +113,20 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
                 message = state.error!!,
                 onRetry = { viewModel.refresh() },
             )
-            else -> ScheduleList(state, listState, viewModel, onOpenMatch)
+            else -> ScheduleList(state, listState, viewModel, onOpenMatch, onPickDate = { showDatePicker = true })
         }
+    }
+
+    if (showDatePicker) {
+        DateRangeDialog(
+            initialStart = state.customStart,
+            initialEnd = state.customEnd,
+            onConfirm = { start, end ->
+                viewModel.setCustomRange(start, end)
+                showDatePicker = false
+            },
+            onDismiss = { showDatePicker = false },
+        )
     }
 }
 
@@ -115,6 +139,7 @@ private fun ScheduleList(
     listState: LazyListState,
     viewModel: ScheduleViewModel,
     onOpenMatch: (String) -> Unit,
+    onPickDate: () -> Unit,
 ) {
     LazyColumn(
         state = listState,
@@ -122,7 +147,7 @@ private fun ScheduleList(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        item(key = "header") { ScheduleHeader(state, viewModel) }
+        item(key = "header") { ScheduleHeader(state, viewModel, onPickDate) }
 
         if (state.days.isEmpty()) {
             item(key = "empty") {
@@ -165,24 +190,40 @@ private fun ScheduleList(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ScheduleHeader(state: ScheduleUiState, viewModel: ScheduleViewModel) {
-    Column(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 12.dp)) {
+private fun ScheduleHeader(state: ScheduleUiState, viewModel: ScheduleViewModel, onPickDate: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 12.dp)) {
         Text(
             "赛程",
             style = MaterialTheme.typography.displaySmall,
         )
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            IconButton(onClick = { viewModel.shiftWeek(-1) }) {
+            IconButton(onClick = { viewModel.shiftWeek(-1) }, enabled = state.canShiftWeek) {
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "上一周")
             }
-            Text(
-                state.windowLabel,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center,
-            )
-            IconButton(onClick = { viewModel.shiftWeek(1) }) {
+            // 点击时间窗文字（带日历角标）打开日期范围选择
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable(onClick = onPickDate)
+                    .padding(vertical = 4.dp),
+            ) {
+                Text(
+                    state.windowLabel,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    Icons.Rounded.Event,
+                    contentDescription = "选择日期",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            IconButton(onClick = { viewModel.shiftWeek(1) }, enabled = state.canShiftWeek) {
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "下一周")
             }
         }
@@ -222,3 +263,77 @@ private fun ErrorPane(message: String, onRetry: () -> Unit) {
         TextButton(onClick = onRetry) { Text("重试") }
     }
 }
+
+/** 日期范围选择：按官方文档样式，DatePickerDialog 内嵌 DateRangePicker；只选一天即查单日 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateRangeDialog(
+    initialStart: LocalDate?,
+    initialEnd: LocalDate?,
+    onConfirm: (LocalDate, LocalDate) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // state 工厂可指定 locale，日历的月份/星期文案跟随（remember 版只能用系统语言）
+    val pickerState = remember {
+        DateRangePickerState(
+            locale = Locale.CHINA,
+            initialSelectedStartDateMillis = initialStart?.toPickerMillis(),
+            initialSelectedEndDateMillis = initialEnd?.toPickerMillis(),
+        )
+    }
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val start = pickerState.selectedStartDateMillis ?: return@TextButton
+                    val end = pickerState.selectedEndDateMillis ?: start
+                    onConfirm(start.toPickerLocalDate(), end.toPickerLocalDate())
+                },
+                enabled = pickerState.selectedStartDateMillis != null,
+            ) { Text("查询") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    ) {
+        DateRangePicker(
+            state = pickerState,
+            showModeToggle = false,
+            // 官方默认 title/headline 为英文文案，替换为中文
+            title = {
+                Text(
+                    "选择日期范围",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                )
+            },
+            headline = {
+                val start = pickerState.selectedStartDateMillis?.toPickerLocalDate()
+                val end = pickerState.selectedEndDateMillis?.toPickerLocalDate()
+                val fmt = DateTimeFormatter.ofPattern("M月d日")
+                Text(
+                    when {
+                        start == null -> "开始日期 – 结束日期"
+                        end == null || start == end -> start.format(fmt)
+                        else -> "${start.format(fmt)} – ${end.format(fmt)}"
+                    },
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = if (start == null) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                )
+            },
+            modifier = Modifier.fillMaxWidth().height(500.dp),
+        )
+    }
+}
+
+/** DatePicker 的毫秒值按 UTC 零点换算，与选中的日历格子对齐，避免时区差出一天 */
+private fun Long.toPickerLocalDate(): LocalDate =
+    Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
+
+private fun LocalDate.toPickerMillis(): Long =
+    atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
