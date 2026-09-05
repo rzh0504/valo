@@ -1,34 +1,16 @@
--keepattributes *Annotation*, InnerClasses, EnclosingMethod
+# kotlinx.serialization / OkHttp / WorkManager / Room / Glance 均自带 consumer keep 规则，
+# 这里只保留项目自身需要的部分。javax.crypto / java.security 是平台类，无需 keep。
 
-# ── kotlinx.serialization ──
--keep,includedescriptorclasses class com.rzh.valo.data.** { *; }
+-keepattributes RuntimeVisibleAnnotations, AnnotationDefault
+
+# ── kotlinx.serialization：@Serializable 模型的生成序列化器与 Companion.serializer() ──
+-keep class com.rzh.valo.data.**$$serializer { *; }
 -keepclassmembers class com.rzh.valo.data.** {
     *** Companion;
-    *** INSTANCE;
     kotlinx.serialization.KSerializer serializer(...);
 }
--keep class com.rzh.valo.data.**$$serializer { *; }
--keepclassmembers class * extends kotlinx.serialization.internal.PluginGeneratedSerialDescriptor {
-    <fields>;
-}
 
-# ── OkHttp ──
+# ── OkHttp 可选安全依赖（官方建议的 dontwarn） ──
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
-
-# ── JCE / Crypto (AES-CBC in HaojiaoApi) ──
--keep class javax.crypto.** { *; }
--keep class javax.crypto.spec.** { *; }
--keep class java.security.** { *; }
-
-# ── Glance widget ──
--keep class com.rzh.valo.widget.** { *; }
-
-# ── AndroidX WorkManager / Room (反射实例化 WorkDatabase_Impl) ──
--keep class * extends androidx.work.Worker { <init>(...); }
--keep class * extends androidx.work.ListenableWorker { <init>(...); }
--keep class * extends androidx.work.CoroutineWorker { <init>(...); }
--keep class * extends androidx.room.RoomDatabase { <init>(...); }
--keep class * extends androidx.room.RoomDatabase$Callback { <init>(...); }
--keep class androidx.work.impl.WorkDatabase_Impl { <init>(...); }
