@@ -61,6 +61,17 @@ val TIME_FORMAT: DateTimeFormatter =
 
 fun formatTime(epochMillis: Long): String = TIME_FORMAT.format(Instant.ofEpochMilli(epochMillis))
 
+/** 未开赛的相对开赛时间；已到点/已开赛返回 null */
+fun relativeStartLabel(startTime: Long, now: Long = System.currentTimeMillis()): String? {
+    val minutes = (startTime - now) / 60_000
+    return when {
+        startTime <= now -> null
+        minutes < 1 -> "即将开始"
+        minutes < 60 -> "$minutes 分钟后"
+        else -> "${minutes / 60} 小时后"
+    }
+}
+
 /** Expressive 按压回弹：按下去轻微缩小，松手弹回 */
 fun Modifier.bouncyPress(interactionSource: MutableInteractionSource): Modifier = composed {
     val pressed by interactionSource.collectIsPressedAsState()
@@ -170,6 +181,8 @@ fun MatchCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     emphasized: Boolean = false,
+    /** 未开赛时在时间旁追加相对开赛时间（仅今天页使用，跨天窗口无意义） */
+    showCountdown: Boolean = false,
 ) {
     val versus = item.versus
     val main = versus?.mainCamp?.firstOrNull()
@@ -204,6 +217,16 @@ fun MatchCard(
                 )
                 Spacer(Modifier.width(8.dp))
                 StatusPill(item.status, emphasized = emphasized)
+                if (showCountdown && item.status == MatchStatus.SCHEDULED) {
+                    relativeStartLabel(item.startTime)?.let { label ->
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
                 Spacer(Modifier.weight(1f))
                 Text(
                     "BO${item.boNum}",
