@@ -39,8 +39,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.ValoApplication
 import com.rzh.valo.data.MatchStatus
-import com.rzh.valo.ui.components.LoadingPane
 import com.rzh.valo.ui.components.MatchCard
+import com.rzh.valo.ui.components.SkeletonCards
 import com.rzh.valo.ui.components.bouncyPress
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -70,9 +70,12 @@ fun HomeScreen(onOpenMatch: (String) -> Unit) {
         },
     ) {
         when {
-            state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                LoadingPane()
-            }
+            state.loading -> SkeletonCards(
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 24.dp),
+            )
             state.error != null && !state.hasMatches -> HomeError(state.error!!, onRetry = { viewModel.refresh() })
             else -> HomeContent(state, viewModel, onOpenMatch)
         }

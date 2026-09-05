@@ -69,9 +69,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.ValoApplication
-import com.rzh.valo.ui.components.LoadingPane
 import com.rzh.valo.data.CN_ZONE
 import com.rzh.valo.ui.components.MatchCard
+import com.rzh.valo.ui.components.SkeletonCards
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -123,9 +123,12 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
             ScheduleTopBlock(state, viewModel, listState, onPickDate = { showDatePicker = true })
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when {
-                    state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        LoadingPane(label = "正在整理赛程")
-                    }
+                    state.loading -> SkeletonCards(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 20.dp)
+                            .padding(top = 8.dp),
+                    )
                     state.error != null && state.days.isEmpty() -> ErrorPane(
                         message = state.error!!,
                         onRetry = { viewModel.refresh() },

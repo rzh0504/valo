@@ -158,6 +158,52 @@ fun LiveDot(color: Color = MaterialTheme.colorScheme.primary) {
     )
 }
 
+/** 首屏加载骨架：仿比赛卡片的占位块，整体透明度脉冲 */
+@Composable
+fun SkeletonCards(modifier: Modifier = Modifier, cards: Int = 4) {
+    val transition = rememberInfiniteTransition(label = "skeleton")
+    val pulse by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.45f,
+        animationSpec = infiniteRepeatable(tween(650), RepeatMode.Reverse),
+        label = "skeletonPulse",
+    )
+    Column(
+        modifier = modifier.alpha(pulse),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        repeat(cards) { SkeletonCard() }
+    }
+}
+
+@Composable
+private fun SkeletonCard() {
+    val block = MaterialTheme.colorScheme.surfaceContainerHighest
+    Card(
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Row {
+                Box(Modifier.size(48.dp, 14.dp).clip(CircleShape).background(block))
+                Spacer(Modifier.weight(1f))
+                Box(Modifier.size(36.dp, 14.dp).clip(CircleShape).background(block))
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f).height(22.dp).clip(MaterialTheme.shapes.extraSmall).background(block))
+                Spacer(Modifier.width(28.dp))
+                Box(Modifier.size(44.dp, 26.dp).clip(MaterialTheme.shapes.extraSmall).background(block))
+                Spacer(Modifier.width(28.dp))
+                Box(Modifier.weight(1f).height(22.dp).clip(MaterialTheme.shapes.extraSmall).background(block))
+            }
+            Spacer(Modifier.height(16.dp))
+            Box(Modifier.fillMaxWidth(0.6f).height(12.dp).clip(CircleShape).background(block))
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LoadingPane(modifier: Modifier = Modifier, label: String = "正在获取赛程") {
