@@ -8,6 +8,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -121,6 +126,11 @@ private fun AppRoot(pendingMatchId: MutableState<String?>) {
         NavHost(
             navController = navController,
             startDestination = "home",
+            // 页签间切换用淡入淡出，避免硬切
+            enterTransition = { fadeIn(tween(220)) },
+            exitTransition = { fadeOut(tween(160)) },
+            popEnterTransition = { fadeIn(tween(220)) },
+            popExitTransition = { fadeOut(tween(160)) },
             modifier = Modifier
                 .fillMaxSize()
                 // 只吃底部导航高度：Scaffold 默认会把状态栏 inset 塞进 top padding，
@@ -130,7 +140,16 @@ private fun AppRoot(pendingMatchId: MutableState<String?>) {
             composable("home") { HomeScreen(onOpenMatch = { navController.navigate("match/$it") }) }
             composable("schedule") { ScheduleScreen(onOpenMatch = { navController.navigate("match/$it") }) }
             composable("settings") { SettingsScreen() }
-            composable("match/{matchId}") { entry ->
+            composable(
+                "match/{matchId}",
+                // 详情页从右侧滑入，返回时滑出
+                enterTransition = {
+                    slideInHorizontally(tween(280)) { it / 3 } + fadeIn(tween(280))
+                },
+                popExitTransition = {
+                    slideOutHorizontally(tween(220)) { it / 3 } + fadeOut(tween(220))
+                },
+            ) { entry ->
                 val matchId = entry.arguments?.getString("matchId").orEmpty()
                 MatchDetailScreen(matchId = matchId, onBack = { navController.popBackStack() })
             }
