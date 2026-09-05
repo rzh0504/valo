@@ -8,9 +8,12 @@ import kotlinx.coroutines.withContext
 
 /**
  * 内存缓存：TTL + 按 key 单飞（同一 key 同时只有一个在途请求，不同 key 互不阻塞），
- * 条目数超上限时淘汰最早拉取的条目。
+ * 条目数超上限时淘汰最早拉取的条目。[now] 仅供测试注入时钟。
  */
-private class TtlCache<K : Any, V : Any>(private val ttlMillis: Long) {
+internal class TtlCache<K : Any, V : Any>(
+    private val ttlMillis: Long,
+    private val now: () -> Long = System::currentTimeMillis,
+) {
 
     private class Entry<V>(val data: V, val fetchedAt: Long)
 
@@ -20,16 +23,16 @@ private class TtlCache<K : Any, V : Any>(private val ttlMillis: Long) {
     suspend fun get(key: K, force: Boolean, fetch: suspend () -> V): V =
         locks.getOrPut(key) { Mutex() }.withLock {
             val cached = entries[key]
-            val now = System.currentTimeMillis()
-            if (!force && cached != null && now - cached.fetchedAt < ttlMillis) {
+            val nowMs = now()
+            if (!force && cached != null && nowMs - cached.fetchedAt < ttlMillis) {
                 cached.data
             } else {
-                fetch().also { put(key, it, now) }
+                fetch().also { put(key, it, nowMs) }
             }
         }
 
-    private fun put(key: K, value: V, now: Long) {
-        entries[key] = Entry(value, now)
+    private fun put(key: K, value: V, nowMs: Long) {
+        entries[key] = Entry(value, nowMs)
         if (entries.size > MAX_ENTRIES) {
             entries.entries
                 .sortedBy { it.value.fetchedAt }
@@ -39,7 +42,7 @@ private class TtlCache<K : Any, V : Any>(private val ttlMillis: Long) {
     }
 
     companion object {
-        private const val MAX_ENTRIES = 32
+        const val MAX_ENTRIES = 32
     }
 }
 

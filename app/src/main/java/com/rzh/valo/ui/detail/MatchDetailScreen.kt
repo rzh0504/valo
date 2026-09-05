@@ -481,7 +481,7 @@ private const val MODE_DEFUSE = 4
 private const val ROUND_GROUP_SIZE = 12
 
 /** 网格总格数：完赛按实际回合数，未完赛补空位到整组，方便看出剩余回合 */
-private fun gridCellCount(map: MapRoundData): Int {
+internal fun gridCellCount(map: MapRoundData): Int {
     val size = map.rounds.size
     if (map.isEnd || size == 0) return size
     return ((size + ROUND_GROUP_SIZE - 1) / ROUND_GROUP_SIZE) * ROUND_GROUP_SIZE
