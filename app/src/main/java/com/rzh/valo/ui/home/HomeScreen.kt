@@ -17,11 +17,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -41,7 +44,7 @@ import com.rzh.valo.ui.components.bouncyPress
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun HomeScreen(onOpenMatch: (String) -> Unit) {
     val app = LocalContext.current.applicationContext as ValoApplication
@@ -50,10 +53,20 @@ fun HomeScreen(onOpenMatch: (String) -> Unit) {
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    val pullState = rememberPullToRefreshState()
     PullToRefreshBox(
         isRefreshing = state.refreshing,
         onRefresh = { viewModel.refresh() },
         modifier = Modifier.fillMaxSize().statusBarsPadding(),
+        state = pullState,
+        // Expressive 变形加载指示器：拉动时随距离变形，刷新中持续动画
+        indicator = {
+            PullToRefreshDefaults.LoadingIndicator(
+                modifier = Modifier.align(Alignment.TopCenter),
+                state = pullState,
+                isRefreshing = state.refreshing,
+            )
+        },
     ) {
         when {
             state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

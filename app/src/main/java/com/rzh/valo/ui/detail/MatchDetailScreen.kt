@@ -47,6 +47,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -129,7 +132,25 @@ fun MatchDetailScreen(matchId: String, onBack: () -> Unit) {
                     Spacer(Modifier.height(12.dp))
                     TextButton(onClick = { viewModel.retry() }) { Text("重试") }
                 }
-                else -> state.item?.let { DetailContent(state.item!!, state.round) }
+                else -> state.item?.let { item ->
+                    val pullState = rememberPullToRefreshState()
+                    PullToRefreshBox(
+                        isRefreshing = state.refreshing,
+                        onRefresh = viewModel::refresh,
+                        modifier = Modifier.fillMaxSize(),
+                        state = pullState,
+                        // Expressive 变形加载指示器：拉动时随距离变形，刷新中持续动画
+                        indicator = {
+                            PullToRefreshDefaults.LoadingIndicator(
+                                modifier = Modifier.align(Alignment.TopCenter),
+                                state = pullState,
+                                isRefreshing = state.refreshing,
+                            )
+                        },
+                    ) {
+                        DetailContent(item, state.round)
+                    }
+                }
             }
         }
     }
