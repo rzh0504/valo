@@ -6,16 +6,22 @@ import android.graphics.Bitmap
 import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
+import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
+import androidx.glance.appwidget.action.ActionCallback
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
@@ -72,7 +78,11 @@ import kotlinx.coroutines.withContext
  */
 object ScheduleWidget : GlanceAppWidget() {
 
-    override val sizeMode: SizeMode = SizeMode.Single
+    /** 窄/宽两档响应式布局：宽档放宽队名与赛事名列 */
+    private val NARROW = DpSize(250.dp, 110.dp)
+    private val WIDE = DpSize(320.dp, 110.dp)
+
+    override val sizeMode: SizeMode = SizeMode.Responsive(setOf(NARROW, WIDE))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val container = (context.applicationContext as ValoApplication).container
@@ -128,8 +138,22 @@ object ScheduleWidget : GlanceAppWidget() {
                 .padding(10.dp),
         ) {
             if (rows.isEmpty()) {
-                Box(GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("暂无比赛数据，打开应用刷新", style = TextStyle(palette.secondary, fontSize = 12.sp))
+                Column(
+                    modifier = GlanceModifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text("暂无比赛数据", style = TextStyle(palette.secondary, fontSize = 12.sp))
+                    Spacer(GlanceModifier.height(8.dp))
+                    Text(
+                        "点击刷新",
+                        style = TextStyle(palette.primary, fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                        modifier = GlanceModifier
+                            .background(palette.card)
+                            .cornerRadius(14.dp)
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                            .clickable(actionRunCallback<WidgetRefreshAction>()),
+                    )
                 }
             } else {
                 LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
@@ -141,6 +165,9 @@ object ScheduleWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetRow(row: RowModel, palette: WidgetPalette) {
+        val wide = LocalSize.current.width >= WIDE.width
+        val teamNameWidth = if (wide) 76.dp else 48.dp
+        val competitionWidth = if (wide) 210.dp else 148.dp
         Column(GlanceModifier.fillMaxWidth()) {
             Column(
                 modifier = GlanceModifier
@@ -164,7 +191,7 @@ object ScheduleWidget : GlanceAppWidget() {
                         row.competition,
                         style = TextStyle(palette.secondary, fontSize = 10.sp),
                         maxLines = 1,
-                        modifier = GlanceModifier.width(148.dp),
+                        modifier = GlanceModifier.width(competitionWidth),
                     )
                 }
                 Spacer(GlanceModifier.height(6.dp))
@@ -181,7 +208,7 @@ object ScheduleWidget : GlanceAppWidget() {
                                 textAlign = TextAlign.Start,
                             ),
                             maxLines = 1,
-                            modifier = GlanceModifier.width(48.dp),
+                            modifier = GlanceModifier.width(teamNameWidth),
                         )
                         Text(
                             row.score,
@@ -197,7 +224,7 @@ object ScheduleWidget : GlanceAppWidget() {
                                 textAlign = TextAlign.End,
                             ),
                             maxLines = 1,
-                            modifier = GlanceModifier.width(48.dp),
+                            modifier = GlanceModifier.width(teamNameWidth),
                         )
                         Spacer(GlanceModifier.width(6.dp))
                         TeamBadge(row.guestTeam, row.guestLogo, palette.secondary)
@@ -310,6 +337,14 @@ private class WidgetPalette(scheme: androidx.compose.material3.ColorScheme, opac
     val onCard = ColorProvider(scheme.onSurface)
     val secondary = ColorProvider(scheme.onSurfaceVariant)
     val primary = ColorProvider(scheme.primary)
+}
+
+/** 小组件空态「点击刷新」：复用刷新任务的拉取→落盘→重绘链路，一次性入队 */
+class WidgetRefreshAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        WorkManager.getInstance(context)
+            .enqueue(OneTimeWorkRequestBuilder<WidgetRefreshWorker>().build())
+    }
 }
 
 class ScheduleWidgetReceiver : GlanceAppWidgetReceiver() {

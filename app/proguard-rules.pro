@@ -15,6 +15,9 @@
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
 
+# ── Glance：ActionCallback 按类名反射无参构造实例化 ──
+-keep class * implements androidx.glance.appwidget.action.ActionCallback { <init>(); }
+
 # ── WorkManager 内嵌 Room：WorkDatabase_Impl 由反射无参构造实例化。
 #    Room 的 consumer rule（-keep class * extends RoomDatabase）只保类不保构造函数，
 #    R8 full mode 下无参构造会被裁掉，导致 release 包启动即崩 ──
