@@ -87,44 +87,38 @@ class ScheduleViewModel(
                 recompute()
             }
         }
-        load()
+        loadCached()
     }
 
-    fun shiftWeek(delta: Int) {
-        if (!_state.value.canShiftWeek) return
-        items = emptyList()
-        _state.update {
-            it.copy(weekOffset = it.weekOffset + delta, days = emptyList(), totalCount = 0)
-        }
-        load()
-    }
-
-    fun backToDefault() {
-        if (_state.value.isDefaultWindow) return
-        items = emptyList()
-        _state.update {
-            it.copy(weekOffset = 0, customStart = null, customEnd = null, days = emptyList(), totalCount = 0)
-        }
-        load()
-    }
-
-    /** 日期选择器确认：查询 [start, end]（含两端）内的比赛；单日则 start == end */
-    fun setCustomRange(start: LocalDate, end: LocalDate) {
-        items = emptyList()
-        _state.update {
-            it.copy(customStart = start, customEnd = end, weekOffset = 0, days = emptyList(), totalCount = 0)
-        }
-        load()
-    }
-
-    fun refresh() = load(force = true)
+    /** 下拉刷新：唯一的手动联网入口 */
+    fun refresh() = loadInternal(force = true)
 
     fun setFilter(filter: Int) {
         _state.update { it.copy(filter = filter) }
         recompute()
     }
 
-    private fun load(force: Boolean = false) {
+    /** 打开页面只读快照，不自动联网；快照缺失或过期时才兜底拉取一次 */
+    private fun loadCached() {
+        viewModelScope.launch {
+            val (start, end) = currentWindow(
+                _state.value.weekOffset,
+                _state.value.customStart,
+                _state.value.customEnd,
+            )
+            val cached = repository.cachedSchedule(start, end)
+            if (cached.isNotEmpty()) {
+                items = cached
+                recompute()
+                _state.update { it.copy(loading = false, error = null) }
+            } else {
+                loadInternal(force = false)
+            }
+        }
+    }
+
+    /** 联网拉取；[force] 为 true 表示用户手动下拉（绕过接口层缓存并显示下拉指示器） */
+    private fun loadInternal(force: Boolean) {
         loadJob?.cancel()
         val requestedOffset = _state.value.weekOffset
         val requestedCustomStart = _state.value.customStart
@@ -134,13 +128,6 @@ class ScheduleViewModel(
             _state.update { it.copy(loading = it.days.isEmpty(), refreshing = force, error = null) }
             try {
                 val (start, end) = currentWindow(requestedOffset, requestedCustomStart, requestedCustomEnd)
-                if (!force && isDefaultWindow && items.isEmpty()) {
-                    repository.cachedSchedule(start, end).takeIf { it.isNotEmpty() }?.let { cached ->
-                        items = cached
-                        recompute()
-                        _state.update { it.copy(loading = false, refreshing = true) }
-                    }
-                }
                 val list = repository.schedule(start, end, force)
                 if (_state.value.weekOffset != requestedOffset ||
                     _state.value.customStart != requestedCustomStart ||
@@ -159,6 +146,33 @@ class ScheduleViewModel(
                 _state.update { it.copy(loading = false, refreshing = false, error = "网络请求失败，请下拉重试") }
             }
         }
+    }
+
+    fun shiftWeek(delta: Int) {
+        if (!_state.value.canShiftWeek) return
+        items = emptyList()
+        _state.update {
+            it.copy(weekOffset = it.weekOffset + delta, days = emptyList(), totalCount = 0)
+        }
+        loadInternal(force = false)
+    }
+
+    fun backToDefault() {
+        if (_state.value.isDefaultWindow) return
+        items = emptyList()
+        _state.update {
+            it.copy(weekOffset = 0, customStart = null, customEnd = null, days = emptyList(), totalCount = 0)
+        }
+        loadCached()
+    }
+
+    /** 日期选择器确认：查询 [start, end]（含两端）内的比赛；单日则 start == end */
+    fun setCustomRange(start: LocalDate, end: LocalDate) {
+        items = emptyList()
+        _state.update {
+            it.copy(customStart = start, customEnd = end, weekOffset = 0, days = emptyList(), totalCount = 0)
+        }
+        loadInternal(force = false)
     }
 
     private fun recompute() {

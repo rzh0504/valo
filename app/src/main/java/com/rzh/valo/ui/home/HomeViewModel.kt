@@ -47,30 +47,43 @@ class HomeViewModel(
                 recompute()
             }
         }
-        load()
+        loadCached()
     }
 
-    fun refresh() = load(force = true)
+    /** 下拉刷新：唯一的手动联网入口 */
+    fun refresh() = loadInternal(force = true)
 
     /** 点击汇总胶囊切换筛选；再次点击取消筛选回到全部 */
     fun toggleFilter(status: Int) {
         _state.update { it.copy(filter = if (it.filter == status) null else status) }
     }
 
-    private fun load(force: Boolean = false) {
+    /** 打开页面只读快照，不自动联网；快照缺失或过期时才兜底拉取一次 */
+    private fun loadCached() {
+        viewModelScope.launch {
+            val today = LocalDate.now(CN_ZONE)
+            val cached = repository.cachedHomeSchedule(
+                today.atStartOfDay(CN_ZONE).toInstant().toEpochMilli(),
+                today.plusDays(1).atStartOfDay(CN_ZONE).toInstant().toEpochMilli(),
+            )
+            if (cached.isNotEmpty()) {
+                items = cached
+                recompute(today)
+                _state.update { it.copy(loading = false, error = null) }
+            } else {
+                loadInternal(force = false)
+            }
+        }
+    }
+
+    /** 联网拉取；[force] 为 true 表示用户手动下拉（绕过接口层缓存并显示下拉指示器） */
+    private fun loadInternal(force: Boolean) {
         viewModelScope.launch {
             _state.update { it.copy(loading = !it.hasMatches, refreshing = force, error = null) }
             try {
                 val today = LocalDate.now(CN_ZONE)
                 val start = today.atStartOfDay(CN_ZONE).toInstant().toEpochMilli()
                 val end = today.plusDays(1).atStartOfDay(CN_ZONE).toInstant().toEpochMilli()
-                if (!force && items.isEmpty()) {
-                    repository.cachedHomeSchedule(start, end).takeIf { it.isNotEmpty() }?.let { cached ->
-                        items = cached
-                        recompute(today)
-                        _state.update { it.copy(loading = false, refreshing = true) }
-                    }
-                }
                 items = repository.schedule(start, end, force)
                 repository.saveHomeSnapshot(items)
                 recompute(today)
