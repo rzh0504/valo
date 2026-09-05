@@ -56,7 +56,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        pendingMatchId.value = intent?.getStringExtra(EXTRA_MATCH_ID)
+        // 仅首次创建时消费深链 extra：旋转等重建时 intent 仍带着同一 extra，
+        // 重复读取会把用户再次导航到详情页
+        if (savedInstanceState == null) {
+            pendingMatchId.value = intent?.getStringExtra(EXTRA_MATCH_ID)
+        }
         val app = application as ValoApplication
         setContent {
             val settings = app.container.settingsStore
