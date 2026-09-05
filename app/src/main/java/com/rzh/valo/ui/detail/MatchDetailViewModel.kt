@@ -13,6 +13,8 @@ import com.rzh.valo.data.TeamRecentSummary
 import com.rzh.valo.data.VersusInfo
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -91,14 +93,17 @@ class MatchDetailViewModel(
         }
     }
 
-    private suspend fun fetchDetail(force: Boolean): Pair<MatchItem, RoundData> {
-        val item = repository.matchDetail(matchId, force)
-        val round = if (item.status != MatchStatus.SCHEDULED) {
+    /**
+     * 详情与逐回合并发拉取（round 接口对未开赛比赛返回空数据，失败不阻塞详情展示）；
+     * 未开赛时丢弃 round 结果，与"开赛后可查看"的占位文案一致。
+     */
+    private suspend fun fetchDetail(force: Boolean): Pair<MatchItem, RoundData> = coroutineScope {
+        val round = async {
             runCatching { repository.matchRound(matchId, force) }.getOrDefault(RoundData())
-        } else {
-            RoundData()
         }
-        return item to round
+        val item = repository.matchDetail(matchId, force)
+        val roundData = round.await()
+        item to if (item.status == MatchStatus.SCHEDULED) RoundData() else roundData
     }
 
     /** 打开战队近期战绩 sheet 时加载； foresight 一次请求含双队数据，按点击的队伍取对应一侧 */

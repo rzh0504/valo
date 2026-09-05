@@ -58,6 +58,9 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
@@ -89,11 +92,16 @@ object ScheduleWidget : GlanceAppWidget() {
             ThemeMode.DARK -> true
         }
         val palette = WidgetPalette(valoColorScheme(context, darkTheme, data.dynamicColor), data.opacity)
-        val rows = widgetRows(data.items, data.matchLevels).map { row ->
-            row.copy(
-                mainLogo = loadLogo(context, row.mainLogoPath),
-                guestLogo = loadLogo(context, row.guestLogoPath),
-            )
+        // 队标并发加载，Coil 磁盘缓存命中时不发网络
+        val rows = coroutineScope {
+            widgetRows(data.items, data.matchLevels).map { row ->
+                async {
+                    row.copy(
+                        mainLogo = loadLogo(context, row.mainLogoPath),
+                        guestLogo = loadLogo(context, row.guestLogoPath),
+                    )
+                }
+            }.awaitAll()
         }
         provideContent {
             Content(
