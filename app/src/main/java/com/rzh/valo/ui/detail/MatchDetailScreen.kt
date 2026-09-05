@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -298,8 +299,7 @@ private fun MapsSection(round: RoundData) {
         )
         Spacer(Modifier.height(10.dp))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(round.list) { mapData ->
-                val i = round.list.indexOf(mapData)
+            itemsIndexed(round.list) { i, mapData ->
                 MapPill(
                     label = mapData.map?.displayName ?: "地图 ${i + 1}",
                     score = "${mapData.mainScore?.total ?: 0} : ${mapData.guestScore?.total ?: 0}",
