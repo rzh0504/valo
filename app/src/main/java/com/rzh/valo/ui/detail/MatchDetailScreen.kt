@@ -66,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -118,7 +119,10 @@ fun MatchDetailScreen(matchId: String, onBack: () -> Unit) {
         teamSheet?.let { viewModel.loadTeamRecent(it) }
     }
 
+    // 内容滚到顶栏下方时顶栏变色分层（scrolledContainerColor 需要 scrollBehavior 才生效）
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
                 title = { Text("比赛详情") },
@@ -131,6 +135,7 @@ fun MatchDetailScreen(matchId: String, onBack: () -> Unit) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
                     }
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { padding ->
