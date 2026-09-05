@@ -117,10 +117,14 @@ class MatchRepository(
             snapshot.items.filter { it.startTime in startTime until endTime }.sortedBy { it.startTime }
         }
 
+    /**
+     * 首页快照仅作短时间内重进的冷启动兑底：「今天」页展示实时比分/状态，
+     * 过期阈值与接口层缓存 [WINDOW_TTL] 一致，避免把几小时前的旧状态当作当前状态展示。
+     */
     suspend fun cachedHomeSchedule(startTime: Long, endTime: Long): List<MatchItem> =
         withContext(Dispatchers.IO) {
             val snapshot = store.load() ?: return@withContext emptyList()
-            if (System.currentTimeMillis() - snapshot.homeFetchedAt > SNAPSHOT_TTL) return@withContext emptyList()
+            if (System.currentTimeMillis() - snapshot.homeFetchedAt > HOME_SNAPSHOT_TTL) return@withContext emptyList()
             snapshot.homeItems.filter { it.startTime in startTime until endTime }.sortedBy { it.startTime }
         }
 
@@ -169,6 +173,7 @@ class MatchRepository(
         private const val WINDOW_TTL = 5 * 60_000L
         private const val DETAIL_TTL = 15 * 60_000L
         private const val SNAPSHOT_TTL = 24 * 60 * 60_000L
+        private const val HOME_SNAPSHOT_TTL = WINDOW_TTL
         private const val PAGE_SIZE = 100
         private const val MAX_PAGES = 3
         private const val SORT_ASC = 1
