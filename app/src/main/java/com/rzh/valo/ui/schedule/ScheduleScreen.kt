@@ -4,7 +4,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +32,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.Today
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.DateRangePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -71,6 +77,7 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -125,6 +132,11 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
                     )
                     else -> ScheduleList(state, listState, onOpenMatch)
                 }
+                TodayFab(
+                    state = state,
+                    listState = listState,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
+                )
             }
         }
     }
@@ -146,6 +158,7 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
 private fun headerOffset(state: ScheduleUiState, dayIndex: Int): Int =
     state.days.take(dayIndex).sumOf { it.matches.size + 1 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ScheduleList(
     state: ScheduleUiState,
@@ -171,7 +184,7 @@ private fun ScheduleList(
         }
 
         state.days.forEach { day ->
-            item(key = "day_${day.date}") { DayHeader(day) }
+            stickyHeader(key = "day_${day.date}") { DayHeader(day) }
             items(day.matches, key = { it.id }) { match ->
                 MatchCard(
                     item = match,
@@ -208,6 +221,39 @@ private fun DayHeader(day: DayGroup) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/** 滚离今天后显示的悬浮按钮：点击回到今天的日期头 */
+@Composable
+private fun TodayFab(
+    state: ScheduleUiState,
+    listState: LazyListState,
+    modifier: Modifier = Modifier,
+) {
+    val scope = rememberCoroutineScope()
+    val todayIndex = remember(state.days) {
+        state.days.indexOfFirst { it.isToday }.takeIf { it >= 0 }
+    }
+    val visible by remember(state.days, todayIndex) {
+        derivedStateOf {
+            todayIndex != null &&
+                listState.layoutInfo.visibleItemsInfo.none { it.key == "day_${state.days[todayIndex].date}" }
+        }
+    }
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn() + scaleIn(initialScale = 0.8f),
+        exit = fadeOut() + scaleOut(targetScale = 0.8f),
+        modifier = modifier,
+    ) {
+        ExtendedFloatingActionButton(
+            onClick = {
+                todayIndex?.let { scope.launch { listState.animateScrollToItem(headerOffset(state, it)) } }
+            },
+            icon = { Icon(Icons.Rounded.Today, contentDescription = null) },
+            text = { Text("回到今天") },
+        )
     }
 }
 
