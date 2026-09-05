@@ -73,6 +73,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -105,6 +107,20 @@ private val FULL_TIME_FORMAT: DateTimeFormatter =
 
 private val SHORT_DATE_FORMAT: DateTimeFormatter =
     DateTimeFormatter.ofPattern("M月d日", Locale.CHINA).withZone(CN_ZONE)
+
+/** 页面内容区的水平内边距 */
+private val PAGE_PADDING = 20.dp
+
+/**
+ * 让横向列表越出父级 [PAGE_PADDING] 内边距、占满屏宽，
+ * 配合等宽 contentPadding 使内容对齐、滚动在屏幕边缘裁切。
+ */
+private fun Modifier.fullBleed(horizontal: Dp = PAGE_PADDING): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(
+        constraints.copy(maxWidth = constraints.maxWidth + (horizontal * 2).roundToPx())
+    )
+    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -196,7 +212,7 @@ private fun DetailContent(item: MatchItem, round: RoundData, onTeamClick: (Parti
     val guest = versus?.guestCamp?.firstOrNull()
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(PAGE_PADDING),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // ---- 头部：赛事与对阵 ----
@@ -279,7 +295,11 @@ private fun DetailContent(item: MatchItem, round: RoundData, onTeamClick: (Parti
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(6.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = PAGE_PADDING),
+                modifier = Modifier.fullBleed(),
+            ) {
                 items(links.distinctBy { it.desc + it.url }) { link -> LinkPill(link) }
             }
         }
@@ -296,14 +316,18 @@ private fun MapsSection(round: RoundData) {
     val index = selected.coerceIn(0, tabCount - 1)
     val fullMatchIndex = round.list.size
 
-    Column {
+    Column(Modifier.fillMaxWidth()) {
         Text(
             "比赛数据",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.height(10.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = PAGE_PADDING),
+            modifier = Modifier.align(Alignment.CenterHorizontally).fullBleed(),
+        ) {
             itemsIndexed(round.list) { i, mapData ->
                 MapPill(
                     label = mapData.map?.displayName ?: "地图 ${i + 1}",
