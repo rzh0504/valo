@@ -1,5 +1,11 @@
 package com.rzh.valo.ui.schedule
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +47,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -105,15 +112,20 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
             )
         },
     ) {
-        when {
-            state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                LoadingPane(label = "正在整理赛程")
+        Column(Modifier.fillMaxSize()) {
+            ScheduleTopBlock(state, viewModel, listState, onPickDate = { showDatePicker = true })
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                when {
+                    state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        LoadingPane(label = "正在整理赛程")
+                    }
+                    state.error != null && state.days.isEmpty() -> ErrorPane(
+                        message = state.error!!,
+                        onRetry = { viewModel.refresh() },
+                    )
+                    else -> ScheduleList(state, listState, onOpenMatch)
+                }
             }
-            state.error != null && state.days.isEmpty() -> ErrorPane(
-                message = state.error!!,
-                onRetry = { viewModel.refresh() },
-            )
-            else -> ScheduleList(state, listState, viewModel, onOpenMatch, onPickDate = { showDatePicker = true })
         }
     }
 
@@ -130,17 +142,15 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
     }
 }
 
-/** 目标日期头在 LazyColumn 中的 index：页首标题占 1 项，之前每天占「日期头 + 当日场次」项 */
+/** 目标日期头在 LazyColumn 中的 index：头部已移出列表，每天占「日期头 + 当日场次」项 */
 private fun headerOffset(state: ScheduleUiState, dayIndex: Int): Int =
-    1 + state.days.take(dayIndex).sumOf { it.matches.size + 1 }
+    state.days.take(dayIndex).sumOf { it.matches.size + 1 }
 
 @Composable
 private fun ScheduleList(
     state: ScheduleUiState,
     listState: LazyListState,
-    viewModel: ScheduleViewModel,
     onOpenMatch: (String) -> Unit,
-    onPickDate: () -> Unit,
 ) {
     LazyColumn(
         state = listState,
@@ -148,8 +158,6 @@ private fun ScheduleList(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        item(key = "header") { ScheduleHeader(state, viewModel, onPickDate) }
-
         if (state.days.isEmpty()) {
             item(key = "empty") {
                 Box(Modifier.fillMaxWidth().padding(vertical = 64.dp), contentAlignment = Alignment.Center) {
@@ -163,25 +171,7 @@ private fun ScheduleList(
         }
 
         state.days.forEach { day ->
-            item(key = "header_${day.date}") {
-                val fmt = DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.CHINA)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        if (day.isToday) "今天" else day.date.format(fmt),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    if (day.isToday) {
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            day.date.format(fmt),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
+            item(key = "day_${day.date}") { DayHeader(day) }
             items(day.matches, key = { it.id }) { match ->
                 MatchCard(
                     item = match,
@@ -194,47 +184,91 @@ private fun ScheduleList(
     }
 }
 
+@Composable
+private fun DayHeader(day: DayGroup) {
+    val fmt = DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.CHINA)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(vertical = 4.dp),
+    ) {
+        Text(
+            if (day.isToday) "今天" else day.date.format(fmt),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+        )
+        if (day.isToday) {
+            Spacer(Modifier.width(6.dp))
+            Text(
+                day.date.format(fmt),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** 顶部区块：大标题与时间窗行在列表滚动时收起，筛选行常驻 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ScheduleHeader(state: ScheduleUiState, viewModel: ScheduleViewModel, onPickDate: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 12.dp)) {
-        Text(
-            "赛程",
-            style = MaterialTheme.typography.displaySmall,
-        )
-        Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            IconButton(onClick = { viewModel.shiftWeek(-1) }, enabled = state.canShiftWeek) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "上一周")
-            }
-            // 点击时间窗文字（带日历角标）打开日期范围选择
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(MaterialTheme.shapes.small)
-                    .clickable(onClick = onPickDate)
-                    .padding(vertical = 4.dp),
-            ) {
+private fun ScheduleTopBlock(
+    state: ScheduleUiState,
+    viewModel: ScheduleViewModel,
+    listState: LazyListState,
+    onPickDate: () -> Unit,
+) {
+    val expanded by remember { derivedStateOf { !listState.canScrollBackward } }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
                 Text(
-                    state.windowLabel,
-                    style = MaterialTheme.typography.titleMedium,
+                    "赛程",
+                    style = MaterialTheme.typography.displaySmall,
                 )
-                Spacer(Modifier.width(6.dp))
-                Icon(
-                    Icons.Rounded.Event,
-                    contentDescription = "选择日期",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            IconButton(onClick = { viewModel.shiftWeek(1) }, enabled = state.canShiftWeek) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "下一周")
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    IconButton(onClick = { viewModel.shiftWeek(-1) }, enabled = state.canShiftWeek) {
+                        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "上一周")
+                    }
+                    // 点击时间窗文字（带日历角标）打开日期范围选择
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable(onClick = onPickDate)
+                            .padding(vertical = 4.dp),
+                    ) {
+                        Text(
+                            state.windowLabel,
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            Icons.Rounded.Event,
+                            contentDescription = "选择日期",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    IconButton(onClick = { viewModel.shiftWeek(1) }, enabled = state.canShiftWeek) {
+                        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "下一周")
+                    }
+                }
             }
         }
-        Spacer(Modifier.height(12.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp),
+        ) {
             SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
                 val options = listOf(
                     ScheduleFilter.ALL to "全部",
