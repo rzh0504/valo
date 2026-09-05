@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -176,12 +177,13 @@ private fun HeroHeader(state: HomeUiState, viewModel: HomeViewModel) {
     }
 }
 
-/** 可点击的状态筛选胶囊：选中实色，未选中灰色 */
+/** 可点击的状态筛选胶囊：选中实色，未选中灰色；计数为 0 且未选中时置灰禁点（避免进入空筛选态） */
 @Composable
 private fun SummaryChip(label: String, count: Int, selected: Boolean, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
+    val enabled = count > 0 || selected
     Surface(
-            shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.large,
         color = if (selected) {
             MaterialTheme.colorScheme.primary
         } else {
@@ -193,8 +195,14 @@ private fun SummaryChip(label: String, count: Int, selected: Boolean, onClick: (
             MaterialTheme.colorScheme.onSurfaceVariant
         },
         modifier = Modifier
+            .alpha(if (enabled) 1f else 0.45f)
             .bouncyPress(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick,
+            ),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
