@@ -47,8 +47,8 @@ import com.rzh.valo.ValoApplication
 import com.rzh.valo.data.CN_ZONE
 import com.rzh.valo.data.HaojiaoApi
 import com.rzh.valo.data.MatchItem
-import com.rzh.valo.data.MATCH_LEVELS
 import com.rzh.valo.data.MatchStatus
+import com.rzh.valo.data.filterByLevels
 import com.rzh.valo.data.ThemeMode
 import com.rzh.valo.ui.theme.valoColorScheme
 import java.time.Instant
@@ -237,10 +237,7 @@ object ScheduleWidget : GlanceAppWidget() {
 
     private fun widgetRows(items: List<MatchItem>, matchLevels: Set<String>): List<RowModel> {
         val now = System.currentTimeMillis()
-        val levelFiltered = items.filter { match ->
-            val level = match.level?.uppercase()
-            level !in MATCH_LEVELS || level in matchLevels
-        }
+        val levelFiltered = items.filterByLevels(matchLevels)
         // 按状态过滤：进行中/未开赛都保留（开赛时间已过但状态未更新也继续展示），
         // 直到真正结束后才移出；全部结束时回退展示最近的完赛比赛。
         val active = levelFiltered

@@ -8,6 +8,7 @@ import com.rzh.valo.data.MatchRepository
 import com.rzh.valo.data.MatchStatus
 import com.rzh.valo.data.MATCH_LEVELS
 import com.rzh.valo.data.SettingsStore
+import com.rzh.valo.data.filterByLevels
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -98,10 +99,7 @@ class HomeViewModel(
     }
 
     private fun recompute(date: LocalDate = _state.value.date) {
-        val filtered = items.filter { match ->
-            val level = match.level?.uppercase()
-            level !in MATCH_LEVELS || level in matchLevels
-        }
+        val filtered = items.filterByLevels(matchLevels)
         _state.update {
             it.copy(
                 date = date,

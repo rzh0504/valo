@@ -7,6 +7,7 @@ import com.rzh.valo.data.MatchItem
 import com.rzh.valo.data.MATCH_LEVELS
 import com.rzh.valo.data.MatchRepository
 import com.rzh.valo.data.SettingsStore
+import com.rzh.valo.data.filterByLevels
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZonedDateTime
@@ -177,10 +178,7 @@ class ScheduleViewModel(
 
     private fun recompute() {
         val today = LocalDate.now(CN_ZONE)
-        val levelFiltered = items.filter { match ->
-            val level = match.level?.uppercase()
-            level !in MATCH_LEVELS || level in matchLevels
-        }
+        val levelFiltered = items.filterByLevels(matchLevels)
         val filtered = when (val f = _state.value.filter) {
             ScheduleFilter.SCHEDULED -> levelFiltered.filter { it.status == f }
             ScheduleFilter.FINISHED -> levelFiltered.filter { it.status == f }

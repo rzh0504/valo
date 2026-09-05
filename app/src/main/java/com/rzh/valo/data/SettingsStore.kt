@@ -25,6 +25,12 @@ private val Context.dataStore by preferencesDataStore(name = "settings")
 
 val MATCH_LEVELS = listOf("S", "A", "B", "C")
 
+/** 按用户勾选的赛事级别过滤；接口未标注级别（或级别不在已知集合内）的比赛始终保留 */
+fun List<MatchItem>.filterByLevels(enabled: Set<String>): List<MatchItem> = filter { match ->
+    val level = match.level?.uppercase()
+    level !in MATCH_LEVELS || level in enabled
+}
+
 /** 应用设置（DataStore 持久化） */
 class SettingsStore(private val context: Context) {
 
