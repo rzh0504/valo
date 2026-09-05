@@ -130,8 +130,9 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
     }
 }
 
+/** 目标日期头在 LazyColumn 中的 index：页首标题占 1 项，之前每天占「日期头 + 当日场次」项 */
 private fun headerOffset(state: ScheduleUiState, dayIndex: Int): Int =
-    state.days.take(dayIndex).sumOf { it.matches.size + 1 }
+    1 + state.days.take(dayIndex).sumOf { it.matches.size + 1 }
 
 @Composable
 private fun ScheduleList(
