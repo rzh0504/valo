@@ -97,16 +97,23 @@ class MatchRepository(
             }
         }
 
-    /** 保存/读取快照（仅默认时间窗的数据会写入，供小组件使用）。 */
-    fun saveSnapshot(items: List<MatchItem>) = store.save(items)
+    /** 保存/读取快照（仅默认时间窗的数据会写入，供小组件使用）；[coveredStart, coveredEnd) 为数据实际覆盖的时间窗。 */
+    fun saveSnapshot(items: List<MatchItem>, coveredStart: Long, coveredEnd: Long) =
+        store.save(items, coveredStart, coveredEnd)
 
     fun loadSnapshot(): SnapshotStore.Snapshot? = store.load()
 
-    /** 冷启动时从磁盘快照中恢复指定时间窗，网络请求随后负责更新数据。 */
+    /**
+     * 冷启动时从磁盘快照中恢复指定时间窗，网络请求随后负责更新数据。
+     * 快照必须完整覆盖 [startTime, endTime)，否则视为未命中——
+     * 小组件任务写入的窗口（近 36 小时 + 7 天）比赛程页默认窗口窄，
+     * 直接按窗口过滤会把"窗口外"错当成"没有比赛"。
+     */
     suspend fun cachedSchedule(startTime: Long, endTime: Long): List<MatchItem> =
         withContext(Dispatchers.IO) {
             val snapshot = store.load() ?: return@withContext emptyList()
             if (System.currentTimeMillis() - snapshot.fetchedAt > SNAPSHOT_TTL) return@withContext emptyList()
+            if (startTime < snapshot.coveredStart || endTime > snapshot.coveredEnd) return@withContext emptyList()
             snapshot.items.filter { it.startTime in startTime until endTime }.sortedBy { it.startTime }
         }
 

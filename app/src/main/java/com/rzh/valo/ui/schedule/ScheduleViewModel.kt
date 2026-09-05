@@ -137,7 +137,7 @@ class ScheduleViewModel(
                 }
                 items = list
                 // 仅默认窗口写快照，小组件始终消费"近期"数据
-                if (isDefaultWindow) repository.saveSnapshot(list)
+                if (isDefaultWindow) repository.saveSnapshot(list, start, end)
                 recompute()
                 _state.update { it.copy(loading = false, refreshing = false, error = null) }
             } catch (e: CancellationException) {

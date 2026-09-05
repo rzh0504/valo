@@ -27,7 +27,7 @@ class WidgetRefreshWorker(
         return try {
             val (start, end) = repository.widgetWindow()
             val items = repository.schedule(start, end, force = true)
-            repository.saveSnapshot(items)
+            repository.saveSnapshot(items, start, end)
             updateAllScheduleWidgets(applicationContext)
             Result.success()
         } catch (e: Exception) {

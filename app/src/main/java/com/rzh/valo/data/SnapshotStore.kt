@@ -18,13 +18,20 @@ class SnapshotStore(context: Context) {
         val items: List<MatchItem> = emptyList(),
         val homeFetchedAt: Long = 0L,
         val homeItems: List<MatchItem> = emptyList(),
+        /**
+         * [items] 实际拉取时使用的时间窗 [coveredStart, coveredEnd)。
+         * 赛程页与小组件任务的窗口不同，读取方须确认请求窗口被覆盖才能命中；
+         * 旧快照缺省为 0，视作不覆盖任何窗口。
+         */
+        val coveredStart: Long = 0L,
+        val coveredEnd: Long = 0L,
     )
 
     private val json = Json { ignoreUnknownKeys = true }
     private val file = File(context.filesDir, "schedule_snapshot.json")
 
     @Synchronized
-    fun save(items: List<MatchItem>) {
+    fun save(items: List<MatchItem>, coveredStart: Long, coveredEnd: Long) {
         val previous = load()
         write(
             Snapshot(
@@ -32,6 +39,8 @@ class SnapshotStore(context: Context) {
                 items = items,
                 homeFetchedAt = previous?.homeFetchedAt ?: 0L,
                 homeItems = previous?.homeItems.orEmpty(),
+                coveredStart = coveredStart,
+                coveredEnd = coveredEnd,
             )
         )
     }
@@ -45,6 +54,8 @@ class SnapshotStore(context: Context) {
                 items = previous?.items.orEmpty(),
                 homeFetchedAt = System.currentTimeMillis(),
                 homeItems = items,
+                coveredStart = previous?.coveredStart ?: 0L,
+                coveredEnd = previous?.coveredEnd ?: 0L,
             )
         )
     }
