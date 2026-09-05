@@ -9,6 +9,7 @@ import com.rzh.valo.data.MatchStatus
 import com.rzh.valo.data.MATCH_LEVELS
 import com.rzh.valo.data.SettingsStore
 import java.time.LocalDate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -88,6 +89,8 @@ class HomeViewModel(
                 repository.saveHomeSnapshot(items)
                 recompute(today)
                 _state.update { it.copy(loading = false, refreshing = false, error = null) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, refreshing = false, error = "网络请求失败，请下拉重试") }
             }

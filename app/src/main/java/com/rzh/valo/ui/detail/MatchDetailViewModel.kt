@@ -66,6 +66,8 @@ class MatchDetailViewModel(
             try {
                 val (item, round) = fetchDetail(force = true)
                 _state.update { it.copy(refreshing = false, item = item, round = round, error = null) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.update { it.copy(refreshing = false) }
             }
@@ -78,6 +80,8 @@ class MatchDetailViewModel(
             try {
                 val (item, round) = fetchDetail(force)
                 _state.update { it.copy(loading = false, item = item, round = round) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = "加载失败，请重试") }
             }
