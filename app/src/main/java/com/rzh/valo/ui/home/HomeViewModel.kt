@@ -1,5 +1,6 @@
 package com.rzh.valo.ui.home
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rzh.valo.data.CN_ZONE
@@ -93,6 +94,7 @@ class HomeViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                Log.w("valo", "首页赛程加载失败", e)
                 _state.update { it.copy(loading = false, refreshing = false, error = "网络请求失败，请下拉重试") }
             }
         }

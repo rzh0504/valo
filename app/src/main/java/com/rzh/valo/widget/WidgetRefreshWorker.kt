@@ -1,6 +1,7 @@
 package com.rzh.valo.widget
 
 import android.content.Context
+import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -31,6 +32,7 @@ class WidgetRefreshWorker(
             updateAllScheduleWidgets(applicationContext)
             Result.success()
         } catch (e: Exception) {
+            Log.w("valo", "小组件刷新失败（第 ${runAttemptCount + 1} 次）", e)
             if (runAttemptCount < 3) Result.retry() else Result.failure()
         }
     }

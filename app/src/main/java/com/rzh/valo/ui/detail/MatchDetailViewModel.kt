@@ -1,5 +1,6 @@
 package com.rzh.valo.ui.detail
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rzh.valo.data.MatchItem
@@ -69,6 +70,7 @@ class MatchDetailViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                Log.w("valo", "比赛详情刷新失败 matchId=$matchId", e)
                 _state.update { it.copy(refreshing = false) }
             }
         }
@@ -83,6 +85,7 @@ class MatchDetailViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                Log.w("valo", "比赛详情加载失败 matchId=$matchId", e)
                 _state.update { it.copy(loading = false, error = "加载失败，请重试") }
             }
         }
@@ -122,6 +125,7 @@ class MatchDetailViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                Log.w("valo", "近期战绩加载失败 matchId=$matchId", e)
                 _teamRecent.value = TeamRecentUiState(failed = true)
             }
         }

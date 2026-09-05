@@ -1,6 +1,7 @@
 package com.rzh.valo.data
 
 import android.content.Context
+import android.util.Log
 import java.io.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -68,12 +69,12 @@ class SnapshotStore(context: Context) {
                 file.writeText(tmp.readText())
                 tmp.delete()
             }
-        }
+        }.onFailure { Log.w("valo", "快照写入失败", it) }
     }
 
     @Synchronized
     fun load(): Snapshot? = runCatching {
         if (!file.exists()) return null
         json.decodeFromString<Snapshot>(file.readText())
-    }.getOrNull()
+    }.onFailure { Log.w("valo", "快照读取失败", it) }.getOrNull()
 }
