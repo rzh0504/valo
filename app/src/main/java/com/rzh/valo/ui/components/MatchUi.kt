@@ -165,7 +165,12 @@ fun LoadingPane(modifier: Modifier = Modifier, label: String = "正在获取赛�
 }
 
 @Composable
-fun MatchCard(item: MatchItem, onClick: () -> Unit, emphasized: Boolean = false) {
+fun MatchCard(
+    item: MatchItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false,
+) {
     val versus = item.versus
     val main = versus?.mainCamp?.firstOrNull()
     val guest = versus?.guestCamp?.firstOrNull()
@@ -184,7 +189,7 @@ fun MatchCard(item: MatchItem, onClick: () -> Unit, emphasized: Boolean = false)
         interactionSource = interaction,
         colors = CardDefaults.cardColors(containerColor = container),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.bouncyPress(interaction),
+        modifier = modifier.bouncyPress(interaction),
     ) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

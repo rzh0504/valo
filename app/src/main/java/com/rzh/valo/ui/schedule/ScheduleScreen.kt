@@ -183,7 +183,12 @@ private fun ScheduleList(
                 }
             }
             items(day.matches, key = { it.id }) { match ->
-                MatchCard(item = match, onClick = { onOpenMatch(match.id) })
+                MatchCard(
+                    item = match,
+                    onClick = { onOpenMatch(match.id) },
+                    // 筛选/刷新时平滑位移与淡入淡出，避免列表硬切
+                    modifier = Modifier.animateItem(),
+                )
             }
         }
     }
