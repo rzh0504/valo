@@ -3,7 +3,7 @@
 基于号角（haojiao.cc）无畏契约分区 API 的 Android 原生应用：浏览赛程与比赛详情，附桌面小组件。
 Kotlin + Jetpack Compose + Material 3 Expressive（material3 1.5.0-alpha）。
 
-> 仅本地展示，无登录、无上传、无服务端；数据版权归号角所有，请控制请求频率。
+> 仅本地展示，无登录、无上传、无服务端；数据版权归号角所有，仅供学习交流使用，请控制请求频率。
 
 ## 功能
 
@@ -26,12 +26,12 @@ JDK 17+ 与 Android SDK（compileSdk 37），或 Android Studio 直接打开。
 
 数据来自 `https://api.haojiao.cc`，实现见 `data/HaojiaoApi.kt`：
 
-| 接口 | 用途 |
-| --- | --- |
-| `POST /wiki/api/v1/match/list_visitor` | 比赛列表，按时间窗过滤 |
-| `GET /wiki/api/v1/match/battle_detail` | 比赛总览 |
-| `GET /wiki/api/v1/match/get_valorant_round` | 逐回合明细与选手数据（未开赛返回空） |
-| `GET /wiki/api/v1/foresight/recent_big_match` | 双方近期大赛战绩 |
+| 接口                                          | 用途                                 |
+| --------------------------------------------- | ------------------------------------ |
+| `POST /wiki/api/v1/match/list_visitor`        | 比赛列表，按时间窗过滤               |
+| `GET /wiki/api/v1/match/battle_detail`        | 比赛总览                             |
+| `GET /wiki/api/v1/match/get_valorant_round`   | 逐回合明细与选手数据（未开赛返回空） |
+| `GET /wiki/api/v1/foresight/recent_big_match` | 双方近期大赛战绩                     |
 
 - 请求头签名：`x-hj-sign = SHA1(SALT + nonce + timestamp)`。
 - `text/plain` 响应为 AES-192-CBC 加密的 Base64，OkHttp 拦截器统一解密。
