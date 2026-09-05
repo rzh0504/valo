@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -61,15 +62,14 @@ val TIME_FORMAT: DateTimeFormatter =
 fun formatTime(epochMillis: Long): String = TIME_FORMAT.format(Instant.ofEpochMilli(epochMillis))
 
 /** Expressive 按压回弹：按下去轻微缩小，松手弹回 */
-@Composable
-fun Modifier.bouncyPress(interactionSource: MutableInteractionSource): Modifier {
+fun Modifier.bouncyPress(interactionSource: MutableInteractionSource): Modifier = composed {
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.97f else 1f,
         animationSpec = spring(dampingRatio = 0.45f, stiffness = 800f),
         label = "pressScale",
     )
-    return this.graphicsLayer {
+    graphicsLayer {
         scaleX = scale
         scaleY = scale
     }
