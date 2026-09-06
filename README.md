@@ -5,6 +5,13 @@ Kotlin + Jetpack Compose + Material 3 Expressive（material3 1.5.0-alpha）。
 
 > 仅本地展示，无登录、无上传、无服务端；数据版权归号角所有，仅供学习交流使用，请控制请求频率。
 
+## 截图
+
+<p>
+  <img src="screenshot/Screenshot_1788668747.png" width="280" alt="今天：当日赛程按状态分组" />
+  <img src="screenshot/Screenshot_1788668819.png" width="280" alt="详情：逐回合时间轴与选手数据" />
+</p>
+
 ## 功能
 
 - **今天**：当日赛程按状态分组（进行中 / 未开始 / 已结束），汇总胶囊可筛选，下拉刷新。
