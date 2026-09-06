@@ -33,7 +33,9 @@ jobs:
           printf '%s' "$KEYSTORE_PROPERTIES" > keystore.properties
 
       - name: 构建 release APK（版本号取自 tag）
-        run: ./gradlew :app:assembleRelease -PvaloVersionName="${GITHUB_REF_NAME#v}"
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease -PvaloVersionName="${GITHUB_REF_NAME#v}"
 
       - name: 以 tag 命名产物
         run: cp app/build/outputs/apk/release/app-release.apk "valo-${GITHUB_REF_NAME}.apk"
