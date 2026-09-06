@@ -66,6 +66,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.ValoApplication
@@ -87,6 +89,8 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
         ScheduleViewModel(app.container.repository, app.container.settingsStore)
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // 回到前台时静默再验证，进程存活的热启动不再滞留旧数据
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onResume() }
     val listState = rememberLazyListState()
     var scrolledToToday by rememberSaveable { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }

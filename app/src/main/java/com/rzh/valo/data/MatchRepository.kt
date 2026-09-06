@@ -161,7 +161,8 @@ class MatchRepository(
     companion object {
         private const val HOUR = 3600_000L
         private const val DAY = 24 * HOUR
-        private const val WINDOW_TTL = 5 * 60_000L
+        // internal：页面层回前台的再验证间隔与它保持一致
+        internal const val WINDOW_TTL = 5 * 60_000L
         private const val DETAIL_TTL = 15 * 60_000L
         private const val SNAPSHOT_TTL = 24 * 60 * 60_000L
         private const val HOME_SNAPSHOT_TTL = WINDOW_TTL

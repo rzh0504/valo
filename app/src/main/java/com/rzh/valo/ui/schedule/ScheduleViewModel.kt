@@ -81,6 +81,8 @@ class ScheduleViewModel(
     private var items: List<MatchItem> = emptyList()
     private var matchLevels: Set<String> = MATCH_LEVELS.toSet()
     private var loadJob: Job? = null
+    /** 上次发起联网加载的时间，作为回前台是否再验证的依据 */
+    private var lastRequestedAt = 0L
 
     init {
         viewModelScope.launch {
@@ -92,16 +94,24 @@ class ScheduleViewModel(
         loadCached()
     }
 
-    /** 下拉刷新：唯一的手动联网入口 */
+    /** 下拉刷新：强制绕过接口层缓存并显示下拉指示器 */
     fun refresh() = loadInternal(force = true)
+
+    /** 回到前台：距上次发起加载超过接口层缓存 TTL 时静默再验证，覆盖进程存活的热启动 */
+    fun onResume() {
+        if (System.currentTimeMillis() - lastRequestedAt > MatchRepository.WINDOW_TTL) {
+            loadInternal(force = false)
+        }
+    }
 
     fun setFilter(filter: Int) {
         _state.update { it.copy(filter = filter) }
         recompute()
     }
 
-    /** 打开页面只读快照，不自动联网；快照缺失或过期时才兜底拉取一次 */
+    /** 打开页面先画快照保证秒开，随后总是静默联网再验证；接口层 TTL 会把短时间内的重复请求去重 */
     private fun loadCached() {
+        lastRequestedAt = System.currentTimeMillis()
         viewModelScope.launch {
             val (start, end) = currentWindow(
                 _state.value.weekOffset,
@@ -113,14 +123,14 @@ class ScheduleViewModel(
                 items = cached
                 recompute()
                 _state.update { it.copy(loading = false, error = null) }
-            } else {
-                loadInternal(force = false)
             }
+            loadInternal(force = false)
         }
     }
 
     /** 联网拉取；[force] 为 true 表示用户手动下拉（绕过接口层缓存并显示下拉指示器） */
     private fun loadInternal(force: Boolean) {
+        lastRequestedAt = System.currentTimeMillis()
         loadJob?.cancel()
         val requestedOffset = _state.value.weekOffset
         val requestedCustomStart = _state.value.customStart
