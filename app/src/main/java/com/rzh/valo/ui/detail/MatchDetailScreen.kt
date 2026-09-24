@@ -34,6 +34,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -124,7 +125,11 @@ private fun Modifier.fullBleed(horizontal: Dp = PAGE_PADDING): Modifier = layout
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun MatchDetailScreen(matchId: String, onBack: () -> Unit) {
+fun MatchDetailScreen(
+    matchId: String,
+    onBack: () -> Unit,
+    onOpenTeamSchedule: (Participant) -> Unit = {},
+) {
     val app = LocalContext.current.applicationContext as ValoApplication
     val viewModel: MatchDetailViewModel = viewModel { MatchDetailViewModel(app.container.repository, matchId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -200,7 +205,15 @@ fun MatchDetailScreen(matchId: String, onBack: () -> Unit) {
             },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         ) {
-            TeamRecentSheet(team, teamRecent)
+            TeamRecentSheet(
+                team,
+                teamRecent,
+                onOpenSchedule = {
+                    teamSheet = null
+                    viewModel.dismissTeamRecent()
+                    onOpenTeamSchedule(team)
+                },
+            )
         }
     }
 }
@@ -974,7 +987,7 @@ private fun LinkPill(link: LinkInfo) {
 
 /** 点击战队徽标弹出：近期大赛表现（胜负统计 + 已结束/进行中的比赛），未开始的不显示 */
 @Composable
-private fun TeamRecentSheet(team: Participant, state: TeamRecentUiState?) {
+private fun TeamRecentSheet(team: Participant, state: TeamRecentUiState?, onOpenSchedule: () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -1023,6 +1036,13 @@ private fun TeamRecentSheet(team: Participant, state: TeamRecentUiState?) {
             else -> Column {
                 state.matches.forEach { match -> TeamRecentRow(team, match) }
             }
+        }
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = onOpenSchedule,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("查看完整赛程")
         }
         Spacer(Modifier.height(12.dp))
     }

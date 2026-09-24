@@ -1,6 +1,7 @@
 package com.rzh.valo
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -42,15 +43,18 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.rzh.valo.data.ThemeMode
 import com.rzh.valo.ui.detail.MatchDetailScreen
 import com.rzh.valo.ui.home.HomeScreen
 import com.rzh.valo.ui.schedule.ScheduleScreen
 import com.rzh.valo.ui.settings.SettingsScreen
+import com.rzh.valo.ui.team.TeamScheduleScreen
 import com.rzh.valo.ui.theme.ValoTheme
 
 class MainActivity : ComponentActivity() {
@@ -151,7 +155,44 @@ private fun AppRoot(pendingMatchId: MutableState<String?>) {
                 },
             ) { entry ->
                 val matchId = entry.arguments?.getString("matchId").orEmpty()
-                MatchDetailScreen(matchId = matchId, onBack = { navController.popBackStack() })
+                MatchDetailScreen(
+                    matchId = matchId,
+                    onBack = { navController.popBackStack() },
+                    onOpenTeamSchedule = { team ->
+                        val teamId = team.id
+                        if (!teamId.isNullOrBlank()) {
+                            val name = Uri.encode(team.nameMain.orEmpty().ifBlank { team.displayName })
+                            val short = Uri.encode(team.nameShort.orEmpty())
+                            val icon = Uri.encode(team.icon.orEmpty())
+                            navController.navigate("team/$teamId?name=$name&short=$short&icon=$icon")
+                        }
+                    },
+                )
+            }
+            composable(
+                "team/{teamId}?name={name}&short={short}&icon={icon}",
+                // 战队赛程页与详情页同款右滑入转场
+                enterTransition = {
+                    slideInHorizontally(tween(280)) { it / 3 } + fadeIn(tween(280))
+                },
+                popExitTransition = {
+                    slideOutHorizontally(tween(220)) { it / 3 } + fadeOut(tween(220))
+                },
+                arguments = listOf(
+                    navArgument("teamId") { type = NavType.StringType },
+                    navArgument("name") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("short") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("icon") { type = NavType.StringType; defaultValue = "" },
+                ),
+            ) { entry ->
+                TeamScheduleScreen(
+                    teamId = entry.arguments?.getString("teamId").orEmpty(),
+                    teamName = entry.arguments?.getString("name").orEmpty(),
+                    teamShort = entry.arguments?.getString("short").orEmpty(),
+                    teamIcon = entry.arguments?.getString("icon")?.takeIf { it.isNotBlank() },
+                    onBack = { navController.popBackStack() },
+                    onOpenMatch = { navController.navigate("match/$it") },
+                )
             }
         }
     }
