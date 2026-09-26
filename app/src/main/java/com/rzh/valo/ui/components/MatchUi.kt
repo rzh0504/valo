@@ -86,7 +86,7 @@ fun Modifier.bouncyPress(interactionSource: MutableInteractionSource): Modifier 
     }
 }
 
-/** 队伍/英雄图标：不做圆形裁切，原样展示；传入 shape 时做对应圆角，无图时用浅色块占位 */
+/** 队伍/英雄图标：灰底衬托浅色队标，原样展示不裁切；传入 shape 时底与裁切做对应圆角，无图时用同色块占位 */
 @Composable
 fun TeamLogo(path: String?, size: Int, modifier: Modifier = Modifier, shape: Shape? = null) {
     val url = HaojiaoApi.imageUrl(path)
@@ -100,6 +100,7 @@ fun TeamLogo(path: String?, size: Int, modifier: Modifier = Modifier, shape: Sha
             contentScale = ContentScale.Fit,
             modifier = modifier
                 .size(size.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, shape ?: MaterialTheme.shapes.extraSmall)
                 .let { m -> if (shape != null) m.clip(shape) else m },
         )
     } else {
