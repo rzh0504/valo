@@ -12,20 +12,13 @@ import com.rzh.valo.ui.schedule.ScheduleFilter
 import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** 结果筛选：0 全部 · 1 胜 · 2 负 */
-object TeamResultFilter {
-    const val ALL = 0
-    const val WIN = 1
-    const val LOSE = 2
-}
+/** 赛事 tab：该战队出现过的赛事（按最近一场时间倒序） */
+data class TournamentTab(val tournamentId: String, val label: String)
 
 /** 按日期分组的一组比赛（新日期在前） */
 data class TeamMatchGroup(
@@ -41,28 +34,34 @@ data class TeamScheduleUiState(
     val teamIcon: String? = null,
     val loading: Boolean = true,
     val refreshing: Boolean = false,
-    val loadingOlder: Boolean = false,
+    val loadingMore: Boolean = false,
     val error: String? = null,
-    /** 历史已回溯到下界，没有更早的可加载 */
+    /** 默认视图已翻到整站最早一页，没有更早的可加载 */
     val endReached: Boolean = false,
     val groups: List<TeamMatchGroup> = emptyList(),
-    /** 已收录的比赛总数与战绩（不受筛选影响） */
-    val loadedCount: Int = 0,
-    val winCount: Int = 0,
-    val loseCount: Int = 0,
+    val tabs: List<TournamentTab> = emptyList(),
+    /** 选中的赛事 tab；null = 全部 */
+    val selectedTabId: String? = null,
     val statusFilter: Int = ScheduleFilter.ALL,
-    val resultFilter: Int = TeamResultFilter.ALL,
     val query: String = "",
+    /** 时间范围筛选的档位（null=不限），用于 chip 选中态 */
+    val rangePreset: String? = null,
+    /** 时间范围展示文案（"近3个月" 或 "M月d日 – M月d日"） */
+    val rangeLabel: String? = null,
+    /** 时间范围（含两端）；非空时走按时间窗查询，不再按场数回溯 */
+    val rangeStart: LocalDate? = null,
+    val rangeEnd: LocalDate? = null,
 ) {
     val hasActiveFilters: Boolean
-        get() = statusFilter != ScheduleFilter.ALL ||
-            resultFilter != TeamResultFilter.ALL ||
-            query.isNotBlank()
+        get() = statusFilter != ScheduleFilter.ALL || query.isNotBlank() ||
+            selectedTabId != null || rangeStart != null
 }
 
 /**
- * 战队完整赛程：接口没有按战队过滤的参数，故按 30 天时间段拉取比赛列表、
- * 客户端按战队身份过滤；向过去逐段回溯（加载更早），首屏覆盖近 30 天与未来 60 天。
+ * 战队完整赛程。接口没有按战队过滤的参数，三种数据源都是"整站拉取 + 客户端按战队过滤"：
+ * - 默认视图：整站比赛按开始时间倒序逐页回溯，按场数凑满（首屏 12 场起），加载更早继续翻页；
+ * - 赛事 tab：服务端按 tournament_id 拉取该赛事全部比赛（一次到位，无需翻页）；
+ * - 时间范围：按 60 天子窗口查询 [start, end] 区间。
  */
 class TeamScheduleViewModel(
     private val repository: MatchRepository,
@@ -82,43 +81,91 @@ class TeamScheduleViewModel(
     )
     val state = _state.asStateFlow()
 
-    /** 该战队已加载的全部比赛（跨时间段去重） */
-    private var items: List<MatchItem> = emptyList()
-    /** 已拉取的时间段（按起点升序），刷新时按段再验证 */
-    private val loadedSegments = mutableListOf<Pair<Long, Long>>()
-    /** 初始窗口起点：比它更早的段属于历史段，刷新时不强制绕过缓存 */
-    private var anchorStart = 0L
+    /** 默认数据源：已累积的该战队比赛 */
+    private var allMatches: List<MatchItem> = emptyList()
+    /** 下一个要拉取的整站分页页码（倒序） */
+    private var nextPage = 1
+    /** 整站分页是否已翻完 */
+    private var defaultExhausted = false
+    /** 已选赛事的完整比赛（tournament_id 查询结果，已过滤战队） */
+    private val tournamentData = mutableMapOf<String, List<MatchItem>>()
+    /** 时间范围查询结果（已过滤战队） */
+    private var rangeMatches: List<MatchItem> = emptyList()
     private var lastRequestedAt = 0L
 
     init {
-        loadInitial()
+        initialLoad()
     }
 
-    fun retry() = loadInitial()
+    fun retry() {
+        val s = _state.value
+        when {
+            s.rangeStart != null -> fetchRange(force = true)
+            s.selectedTabId != null -> fetchTournament(s.selectedTabId!!, force = true)
+            else -> initialLoad()
+        }
+    }
 
-    /** 下拉刷新：近期段强制拉取，历史段走缓存再验证（已结束的历史不会再变化） */
+    /** 下拉刷新：重新拉取当前数据源（默认视图只强制刷新最新一页，历史页保持不变） */
     fun refresh() {
-        if (loadedSegments.isEmpty()) {
-            loadInitial()
-        } else {
-            reloadAll(showIndicator = true)
+        val s = _state.value
+        when {
+            s.rangeStart != null -> fetchRange(force = true)
+            s.selectedTabId != null -> fetchTournament(s.selectedTabId!!, force = true)
+            else -> {
+                lastRequestedAt = System.currentTimeMillis()
+                viewModelScope.launch {
+                    _state.update { it.copy(refreshing = true, error = null) }
+                    try {
+                        appendDefaultPage(1, force = true)
+                        recompute()
+                        _state.update { it.copy(refreshing = false, loading = false, error = null) }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.w("valo", "战队赛程刷新失败", e)
+                        _state.update {
+                            it.copy(refreshing = false, loading = false, error = if (allMatches.isEmpty()) "网络请求失败，请下拉重试" else null)
+                        }
+                    }
+                }
+            }
         }
     }
 
     /** 回到前台：距上次请求超过缓存 TTL 时静默再验证 */
     fun onResume() {
         if (System.currentTimeMillis() - lastRequestedAt <= MatchRepository.WINDOW_TTL) return
-        if (loadedSegments.isEmpty()) loadInitial() else reloadAll(showIndicator = false)
+        lastRequestedAt = System.currentTimeMillis()
+        val s = _state.value
+        when {
+            s.rangeStart != null -> fetchRange(force = false)
+            s.selectedTabId != null -> fetchTournament(s.selectedTabId!!, force = false)
+            else -> viewModelScope.launch {
+                try {
+                    appendDefaultPage(1, force = false)
+                    recompute()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w("valo", "战队赛程再验证失败", e)
+                }
+            }
+        }
+    }
+
+    fun selectTab(tournamentId: String?) {
+        if (_state.value.selectedTabId == tournamentId) return
+        _state.update { it.copy(selectedTabId = tournamentId) }
+        if (tournamentId == null || tournamentData.containsKey(tournamentId)) {
+            recompute()
+            return
+        }
+        fetchTournament(tournamentId, force = false)
     }
 
     fun setStatusFilter(filter: Int) {
         _state.update { it.copy(statusFilter = filter) }
-        recompute()
-    }
-
-    /** 再点一次同结果筛选即取消 */
-    fun toggleResult(result: Int) {
-        _state.update { it.copy(resultFilter = if (it.resultFilter == result) TeamResultFilter.ALL else result) }
         recompute()
     }
 
@@ -127,62 +174,45 @@ class TeamScheduleViewModel(
         recompute()
     }
 
-    /** 向过去加载一个时间段；连续 [MAX_SKIP] 段没有该战队比赛时暂停，等下一次触发再继续 */
-    fun loadOlder() {
+    /** 切换时间范围；[start] 为 null 表示不限（回到默认的按场数回溯） */
+    fun setRange(preset: String?, label: String?, start: LocalDate?, end: LocalDate?) {
+        _state.update {
+            it.copy(rangePreset = preset, rangeLabel = label, rangeStart = start, rangeEnd = end)
+        }
+        if (start == null || end == null) {
+            rangeMatches = emptyList()
+            recompute()
+        } else {
+            fetchRange(force = false)
+        }
+    }
+
+    /** 默认视图向历史继续回溯（仅"全部"tab 下可用；赛事/范围视图数据已完整） */
+    fun loadMore() {
         val s = _state.value
-        if (s.loading || s.loadingOlder || s.endReached || s.error != null) return
-        val oldest = loadedSegments.minOfOrNull { it.first } ?: return
+        if (s.loading || s.loadingMore || defaultExhausted) return
+        if (s.rangeStart != null || s.selectedTabId != null) return
         viewModelScope.launch {
-            _state.update { it.copy(loadingOlder = true) }
+            _state.update { it.copy(loadingMore = true) }
             try {
-                var start = oldest - SEGMENT_MS
-                var end = oldest
-                var skip = 0
-                var found: List<MatchItem> = emptyList()
-                var reachedFloor = false
-                while (true) {
-                    found = repository.schedule(start, end).filter { sideOf(it) != 0 }
-                    loadedSegments.add(0, start to end)
-                    if (found.isNotEmpty()) break
-                    val nextStart = start - SEGMENT_MS
-                    if (nextStart < floorStart()) {
-                        reachedFloor = true
-                        break
-                    }
-                    if (skip >= MAX_SKIP) break
-                    skip++
-                    end = start
-                    start = nextStart
-                }
-                if (found.isNotEmpty()) {
-                    items = (items + found).distinctBy { it.id }
-                    recompute()
-                }
-                if (reachedFloor) _state.update { it.copy(endReached = true) }
-                _state.update { it.copy(loadingOlder = false) }
+                fetchDefaultPages(allMatches.size + LOAD_MORE_STEP)
+                recompute()
+                _state.update { it.copy(loadingMore = false, endReached = defaultExhausted) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w("valo", "战队历史赛程加载失败", e)
-                _state.update { it.copy(loadingOlder = false) }
+                _state.update { it.copy(loadingMore = false) }
             }
         }
     }
 
-    /** 首屏：近 30 天 + 未来 60 天，分 3 段并行拉取 */
-    private fun loadInitial() {
+    private fun initialLoad() {
         lastRequestedAt = System.currentTimeMillis()
         viewModelScope.launch {
-            _state.update { it.copy(loading = items.isEmpty(), error = null) }
+            _state.update { it.copy(loading = true, error = null) }
             try {
-                anchorStart = System.currentTimeMillis() - INITIAL_PAST_DAYS * DAY
-                val segments = (0 until INITIAL_SEGMENTS).map { i ->
-                    val start = anchorStart + i * SEGMENT_MS
-                    start to start + SEGMENT_MS
-                }
-                loadedSegments.clear()
-                loadedSegments.addAll(segments)
-                items = fetchSegments(segments)
+                fetchDefaultPages(INITIAL_TARGET)
                 recompute()
                 _state.update { it.copy(loading = false, refreshing = false, error = null) }
             } catch (e: CancellationException) {
@@ -190,57 +220,125 @@ class TeamScheduleViewModel(
             } catch (e: Exception) {
                 Log.w("valo", "战队赛程加载失败", e)
                 _state.update {
-                    it.copy(loading = false, refreshing = false, error = if (items.isEmpty()) "网络请求失败，请点击重试" else null)
+                    it.copy(loading = false, refreshing = false, error = "网络请求失败，请点击重试")
                 }
             }
         }
     }
 
-    private fun reloadAll(showIndicator: Boolean) {
-        lastRequestedAt = System.currentTimeMillis()
+    /** 按页向历史回溯，直到战队比赛凑满 [targetTotal] 场、单次触发页数用尽或整站翻完 */
+    private suspend fun fetchDefaultPages(targetTotal: Int) {
+        var pages = 0
+        while (!defaultExhausted && pages < PAGES_PER_TRIGGER && allMatches.size < targetTotal) {
+            appendDefaultPage(nextPage, force = false)
+            pages++
+        }
+    }
+
+    private suspend fun appendDefaultPage(page: Int, force: Boolean) {
+        val data = repository.recentMatchesPage(page, force)
+        if (page == nextPage) nextPage++
+        allMatches = (allMatches + data.list.filter { sideOf(it) != 0 }).distinctBy { it.id }
+        // 最后一页通常不足一页；恰好整页时多翻一次空页兜底
+        if (data.list.size < MatchRepository.PAGE_SIZE) defaultExhausted = true
+    }
+
+    private fun fetchTournament(tournamentId: String, force: Boolean) {
         viewModelScope.launch {
-            _state.update { it.copy(refreshing = showIndicator, error = null) }
+            _state.update { it.copy(loadingMore = true, error = null) }
             try {
-                items = fetchSegments(loadedSegments.toList(), forceRecent = showIndicator)
+                val list = repository.tournamentMatches(tournamentId, force)
+                    .filter { sideOf(it) != 0 }
+                tournamentData[tournamentId] = list
                 recompute()
-                _state.update { it.copy(refreshing = false, loading = false, error = null) }
+                _state.update { it.copy(loadingMore = false, loading = false, refreshing = false, error = null) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.w("valo", "战队赛程刷新失败", e)
+                Log.w("valo", "战队赛事赛程加载失败", e)
                 _state.update {
-                    it.copy(refreshing = false, loading = false, error = if (items.isEmpty()) "网络请求失败，请下拉重试" else null)
+                    it.copy(
+                        loadingMore = false,
+                        loading = false,
+                        refreshing = false,
+                        error = if (allMatches.isEmpty() && rangeMatches.isEmpty()) "网络请求失败，请重试" else null,
+                    )
                 }
             }
         }
     }
 
-    /** 并行拉取各时间段的比赛并按战队过滤；[forceRecent] 只对近期段强制绕过缓存 */
-    private suspend fun fetchSegments(
-        segments: List<Pair<Long, Long>>,
-        forceRecent: Boolean = false,
-    ): List<MatchItem> = coroutineScope {
-        segments.map { (start, end) ->
-            async { repository.schedule(start, end, force = forceRecent && start >= anchorStart) }
-        }.awaitAll()
-    }.flatMap { list -> list.filter { sideOf(it) != 0 } }
-        .distinctBy { it.id }
+    /** 时间范围查询：拆成 60 天子窗口逐段拉取（每段远小于接口单窗上限，不会截断出缺口） */
+    private fun fetchRange(force: Boolean) {
+        val start = _state.value.rangeStart ?: return
+        val end = _state.value.rangeEnd ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(loadingMore = true, error = null) }
+            try {
+                val items = ArrayList<MatchItem>()
+                var windowStart = start
+                var windows = 0
+                while (!windowStart.isAfter(end) && windows < MAX_RANGE_WINDOWS) {
+                    val windowEnd = minOf(windowStart.plusDays(RANGE_WINDOW_DAYS - 1), end)
+                    items += repository.schedule(
+                        windowStart.atStartOfDay(CN_ZONE).toInstant().toEpochMilli(),
+                        windowEnd.plusDays(1).atStartOfDay(CN_ZONE).toInstant().toEpochMilli(),
+                        force,
+                    )
+                    windowStart = windowEnd.plusDays(1)
+                    windows++
+                }
+                rangeMatches = items.filter { sideOf(it) != 0 }.distinctBy { it.id }
+                recompute()
+                _state.update { it.copy(loadingMore = false, loading = false, refreshing = false, error = null) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w("valo", "战队范围赛程查询失败", e)
+                _state.update {
+                    it.copy(
+                        loadingMore = false,
+                        loading = false,
+                        refreshing = false,
+                        error = if (allMatches.isEmpty() && rangeMatches.isEmpty()) "网络请求失败，请重试" else null,
+                    )
+                }
+            }
+        }
+    }
 
     private fun recompute() {
         val s = _state.value
+        // tab 列表来自默认累积数据（或范围查询结果），与当前选中态解耦，保证切换 tab 时列表稳定
+        val base = if (s.rangeStart != null) rangeMatches else allMatches
+        val tabs = base
+            .filter { it.tournament?.id != null }
+            .groupBy { it.tournament?.id!! }
+            .entries
+            .sortedByDescending { entry -> entry.value.maxOf { it.startTime } }
+            .take(MAX_TABS)
+            .map { entry -> TournamentTab(entry.key, tournamentLabel(entry.value.first())) }
+        val selectedTabId = s.selectedTabId?.takeIf { id -> tabs.any { it.tournamentId == id } }
+
+        val source = when {
+            s.rangeStart != null -> rangeMatches
+            selectedTabId != null -> tournamentData[selectedTabId].orEmpty()
+            else -> allMatches
+        }
+        // 范围视图下选赛事：范围内数据已完整，直接客户端过滤；
+        // 默认视图下选赛事走 tournamentData 整赛事查询，无需再过滤
+        val tabFiltered = if (s.rangeStart != null && selectedTabId != null) {
+            source.filter { it.tournament?.id == selectedTabId }
+        } else {
+            source
+        }
+
         val query = s.query.trim()
-        val filtered = items.asSequence()
+        val filtered = tabFiltered.asSequence()
             .filter { m ->
                 when (s.statusFilter) {
                     ScheduleFilter.SCHEDULED -> m.status == MatchStatus.SCHEDULED
                     ScheduleFilter.FINISHED -> m.status == MatchStatus.FINISHED
-                    else -> true
-                }
-            }
-            .filter { m ->
-                when (s.resultFilter) {
-                    TeamResultFilter.WIN -> isWin(m)
-                    TeamResultFilter.LOSE -> m.isFinished && !isWin(m)
                     else -> true
                 }
             }
@@ -251,14 +349,12 @@ class TeamScheduleViewModel(
         val groups = filtered
             .groupBy { Instant.ofEpochMilli(it.startTime).atZone(CN_ZONE).toLocalDate() }
             .map { (date, matches) -> TeamMatchGroup(date, date == today, matches) }
-        val finished = items.count { it.isFinished && sideOf(it) != 0 }
-        val wins = items.count { isWin(it) }
         _state.update {
             it.copy(
                 groups = groups,
-                loadedCount = items.size,
-                winCount = wins,
-                loseCount = finished - wins,
+                tabs = tabs,
+                selectedTabId = selectedTabId,
+                endReached = defaultExhausted,
             )
         }
     }
@@ -286,10 +382,11 @@ class TeamScheduleViewModel(
         return names.isNotEmpty() && names.intersect(targets).isNotEmpty()
     }
 
-    private fun isWin(item: MatchItem): Boolean {
-        val side = sideOf(item)
-        return item.isFinished && side != 0 && item.versus?.isMainWin == side
-    }
+    /** 赛事 tab 展示名：优先赛事分组名（如"CN联赛 第二赛段"、"全球冠军赛"） */
+    private fun tournamentLabel(item: MatchItem): String =
+        item.group?.nameMain?.takeIf { it.isNotBlank() }
+            ?: item.tournament?.nameMain?.takeIf { it.isNotBlank() }
+            ?: item.tournament?.nameSub.orEmpty()
 
     /** 搜索命中的文本：对手名 + 赛事/阶段名 */
     private fun searchableText(item: MatchItem): String {
@@ -306,17 +403,17 @@ class TeamScheduleViewModel(
         ).joinToString(" ")
     }
 
-    private fun floorStart(): Long = anchorStart - MAX_HISTORY_DAYS * DAY
-
     companion object {
-        private const val DAY = 24 * 3600_000L
-        /** 回溯步长 30 天：接口单窗上限 100 条 × 3 页，30 天窗口内不会截断出缺口 */
-        private const val SEGMENT_MS = 30 * DAY
-        private const val INITIAL_PAST_DAYS = 30L
-        private const val INITIAL_SEGMENTS = 3
-        /** 最多回溯 18 个月 */
-        private const val MAX_HISTORY_DAYS = 550L
-        /** 向前回溯时，没有该战队比赛的空段自动连续跳过的上限 */
-        private const val MAX_SKIP = 2
+        /** 首屏至少凑满的场数 */
+        private const val INITIAL_TARGET = 12
+        /** 每次「加载更早」新增的目标场数 */
+        private const val LOAD_MORE_STEP = 12
+        /** 单次触发最多翻的整站分页页数（每页 100 场），控制请求频率 */
+        private const val PAGES_PER_TRIGGER = 5
+        /** 范围查询的子窗口天数与窗口数上限（覆盖"去年"一整年） */
+        private const val RANGE_WINDOW_DAYS = 60L
+        private const val MAX_RANGE_WINDOWS = 7
+        /** 赛事 tab 最多展示个数 */
+        private const val MAX_TABS = 8
     }
 }

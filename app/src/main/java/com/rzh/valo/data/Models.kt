@@ -24,6 +24,8 @@ data class MatchListRequest(
     @SerialName("sort_by_start_time") val sortByStartTime: Int,
     @SerialName("start_time") val startTime: Long? = null,
     @SerialName("end_time") val endTime: Long? = null,
+    /** 可选，按赛事过滤（实测 2026-09-27：无时间窗时也可用，count 为该赛事全部场数） */
+    @SerialName("tournament_id") val tournamentId: String? = null,
 )
 
 @Serializable

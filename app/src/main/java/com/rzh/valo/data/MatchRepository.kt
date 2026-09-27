@@ -59,6 +59,8 @@ class MatchRepository(
     private val detailCache = TtlCache<String, MatchItem>(DETAIL_TTL)
     private val roundCache = TtlCache<String, RoundData>(DETAIL_TTL)
     private val recentCache = TtlCache<String, RecentBigMatchData>(DETAIL_TTL)
+    private val pageCache = TtlCache<Int, MatchListData>(WINDOW_TTL)
+    private val tournamentCache = TtlCache<String, List<MatchItem>>(WINDOW_TTL)
 
     /**
      * 拉取 [startTime, endTime) 时间窗内的比赛（升序）。
@@ -68,6 +70,36 @@ class MatchRepository(
     suspend fun schedule(startTime: Long, endTime: Long, force: Boolean = false): List<MatchItem> =
         withContext(Dispatchers.IO) {
             windowCache.get(startTime to endTime, force) { fetchPages(startTime, endTime) }
+        }
+
+    /**
+     * 整站比赛分页，按开始时间倒序（实测 sort=2 为从新到旧，与时间窗无关），
+     * 战队赛程页按场数向历史回溯时使用。count 为整站总场数。
+     */
+    suspend fun recentMatchesPage(page: Int, force: Boolean = false): MatchListData =
+        withContext(Dispatchers.IO) {
+            pageCache.get(page, force) {
+                api.matchList(
+                    MatchListRequest(
+                        gameId = HaojiaoApi.GAME_ID,
+                        page = page,
+                        pageSize = PAGE_SIZE,
+                        platform = "web",
+                        matchStatus = listOf(
+                            MatchStatus.SCHEDULED,
+                            MatchStatus.LIVE,
+                            MatchStatus.FINISHED,
+                        ),
+                        sortByStartTime = SORT_DESC,
+                    )
+                )
+            }
+        }
+
+    /** 某赛事（tournament_id）的全部比赛，升序返回。 */
+    suspend fun tournamentMatches(tournamentId: String, force: Boolean = false): List<MatchItem> =
+        withContext(Dispatchers.IO) {
+            tournamentCache.get(tournamentId, force) { fetchTournamentPages(tournamentId) }
         }
 
     /** 比赛详情，单条缓存 [DETAIL_TTL]。 */
@@ -129,6 +161,34 @@ class MatchRepository(
         return (now - 36 * HOUR) to (now + 7 * DAY)
     }
 
+    private suspend fun fetchTournamentPages(tournamentId: String): List<MatchItem> {
+        val all = ArrayList<MatchItem>()
+        var page = 1
+        var count = Int.MAX_VALUE
+        while (page <= MAX_PAGES && all.size < count) {
+            val data = api.matchList(
+                MatchListRequest(
+                    gameId = HaojiaoApi.GAME_ID,
+                    page = page,
+                    pageSize = PAGE_SIZE,
+                    platform = "web",
+                    matchStatus = listOf(
+                        MatchStatus.SCHEDULED,
+                        MatchStatus.LIVE,
+                        MatchStatus.FINISHED,
+                    ),
+                    sortByStartTime = SORT_ASC,
+                    tournamentId = tournamentId,
+                )
+            )
+            count = data.count
+            all += data.list
+            if (data.list.isEmpty()) break
+            page++
+        }
+        return all.distinctBy { it.id }.sortedBy { it.startTime }
+    }
+
     private suspend fun fetchPages(startTime: Long, endTime: Long): List<MatchItem> {
         val all = ArrayList<MatchItem>()
         var page = 1
@@ -166,8 +226,11 @@ class MatchRepository(
         private const val DETAIL_TTL = 15 * 60_000L
         private const val SNAPSHOT_TTL = 24 * 60 * 60_000L
         private const val HOME_SNAPSHOT_TTL = WINDOW_TTL
-        private const val PAGE_SIZE = 100
+        // internal：页面层的翻页结束判断（不足一页即最后一页）与它保持一致
+        internal const val PAGE_SIZE = 100
         private const val MAX_PAGES = 3
         private const val SORT_ASC = 1
+        /** 倒序（2026-09-27 实测：第 1 页返回最新比赛） */
+        private const val SORT_DESC = 2
     }
 }
