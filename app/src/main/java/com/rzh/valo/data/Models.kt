@@ -54,6 +54,67 @@ data class TeamRecentSummary(
     @SerialName("match_lose_count") val lose: Int = 0,
 )
 
+/** 前瞻 · 历史交手记录（fight_big_match，两队 H2H 胜负统计与交手列表） */
+@Serializable
+data class FightHistoryData(
+    @SerialName("main_score_count") val mainScoreCount: TeamRecentSummary? = null,
+    @SerialName("guest_score_count") val guestScoreCount: TeamRecentSummary? = null,
+    @SerialName("match_list") val matchList: List<MatchItem> = emptyList(),
+)
+
+/** 前瞻 · 单张地图上双方的历史战绩（valorant_map） */
+@Serializable
+data class MapRecord(
+    @SerialName("map_id") val id: String = "",
+    @SerialName("name_zh") val nameZh: String? = null,
+    @SerialName("name_en") val nameEn: String? = null,
+    val icon: String? = null,
+    @SerialName("main_match_times") val mainMatches: Int = 0,
+    @SerialName("main_win_times") val mainWins: Int = 0,
+    @SerialName("guest_match_times") val guestMatches: Int = 0,
+    @SerialName("guest_win_times") val guestWins: Int = 0,
+) {
+    val displayName: String get() = nameZh?.takeIf { it.isNotBlank() } ?: nameEn.orEmpty()
+    val hasData: Boolean get() = mainMatches > 0 || guestMatches > 0
+}
+
+// ---------- 赛事（stage_with_group / integral_table） ----------
+
+/** 赛事阶段（stage_id 供积分表、对阵图使用） */
+@Serializable
+data class TournamentStage(
+    @SerialName("unique_id") val id: String = "",
+    @SerialName("stage_name") val name: String? = null,
+    @SerialName("start_date") val startDate: Long = 0L,
+    @SerialName("end_date") val endDate: Long = 0L,
+    @SerialName("group_list") val groupList: List<StageGroup> = emptyList(),
+)
+
+@Serializable
+data class StageGroup(
+    @SerialName("unique_id") val id: String = "",
+    @SerialName("group_name") val name: String? = null,
+)
+
+/** 阶段积分榜的一个分组（Alpha/Omega 等） */
+@Serializable
+data class IntegralGroup(
+    @SerialName("group_id") val groupId: String? = null,
+    @SerialName("integral_list") val rows: List<IntegralRow> = emptyList(),
+)
+
+@Serializable
+data class IntegralRow(
+    @SerialName("participant_info") val team: Participant? = null,
+    val win: Int = 0,
+    val lose: Int = 0,
+    val draw: Int = 0,
+    @SerialName("round_win") val roundWin: Int = 0,
+    @SerialName("round_lose") val roundLose: Int = 0,
+) {
+    val roundDiff: Int get() = roundWin - roundLose
+}
+
 /** 比赛（列表项与详情共用，unknown 字段一律忽略） */
 @Serializable
 data class MatchItem(
@@ -92,7 +153,10 @@ data class GroupInfo(
 )
 
 @Serializable
-data class StageInfo(@SerialName("stage_name") val name: String? = null)
+data class StageInfo(
+    @SerialName("stage_id") val id: String? = null,
+    @SerialName("stage_name") val name: String? = null,
+)
 
 /** 对阵信息；未开赛时两侧 camp 可能为 null（队伍待定） */
 @Serializable

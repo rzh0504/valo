@@ -107,6 +107,41 @@ class HaojiaoApi {
         return exec(Request.Builder().url(url).build())
     }
 
+    /** 前瞻 · 历史交手记录：两队 H2H 胜负统计与交手比赛列表 */
+    fun fightHistory(matchId: String): FightHistoryData {
+        val url = "$BASE/wiki/api/v1/foresight/fight_big_match".toHttpUrl().newBuilder()
+            .addQueryParameter("match_id", matchId)
+            .build()
+        return exec(Request.Builder().url(url).build())
+    }
+
+    /** 前瞻 · 地图胜率：双方在各地图的历史场次与胜场 */
+    fun mapForesight(matchId: String): List<MapRecord> {
+        val url = "$BASE/wiki/api/v1/foresight/valorant_map".toHttpUrl().newBuilder()
+            .addQueryParameter("match_id", matchId)
+            .build()
+        return exec(Request.Builder().url(url).build())
+    }
+
+    /** 赛事阶段与分组（stage_id 供积分表使用） */
+    fun tournamentStages(tournamentId: String): List<TournamentStage> {
+        val url = "$BASE/wiki/api/v1/tournament/stage_with_group".toHttpUrl().newBuilder()
+            .addQueryParameter("game_id", GAME_ID)
+            .addQueryParameter("platform", "web")
+            .addQueryParameter("tournament_id", tournamentId)
+            .build()
+        return exec(Request.Builder().url(url).build())
+    }
+
+    /** 阶段积分榜（按分组返回，rows 顺序即排名） */
+    fun tournamentIntegral(tournamentId: String, stageId: String): List<IntegralGroup> {
+        val url = "$BASE/wiki/api/v1/tournament/integral/table/v2".toHttpUrl().newBuilder()
+            .addQueryParameter("tournament_id", tournamentId)
+            .addQueryParameter("stage_id", stageId)
+            .build()
+        return exec(Request.Builder().url(url).build())
+    }
+
     private inline fun <reified T> exec(request: Request): T {
         client.newCall(request).execute().use { response ->
             val text = response.body?.string().orEmpty()

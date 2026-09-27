@@ -56,6 +56,7 @@ import com.rzh.valo.ui.schedule.ScheduleScreen
 import com.rzh.valo.ui.settings.SettingsScreen
 import com.rzh.valo.ui.team.TeamScheduleScreen
 import com.rzh.valo.ui.theme.ValoTheme
+import com.rzh.valo.ui.tournament.TournamentScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -167,6 +168,9 @@ private fun AppRoot(pendingMatchId: MutableState<String?>) {
                             navController.navigate("team/$teamId?name=$name&short=$short&icon=$icon")
                         }
                     },
+                    onOpenTournament = { id, name ->
+                        navController.navigate("tournament/$id?name=${Uri.encode(name)}")
+                    },
                 )
             }
             composable(
@@ -190,6 +194,30 @@ private fun AppRoot(pendingMatchId: MutableState<String?>) {
                     teamName = entry.arguments?.getString("name").orEmpty(),
                     teamShort = entry.arguments?.getString("short").orEmpty(),
                     teamIcon = entry.arguments?.getString("icon")?.takeIf { it.isNotBlank() },
+                    onBack = { navController.popBackStack() },
+                    onOpenMatch = { navController.navigate("match/$it") },
+                    onOpenTournament = { id, name ->
+                        navController.navigate("tournament/$id?name=${Uri.encode(name)}")
+                    },
+                )
+            }
+            composable(
+                "tournament/{tournamentId}?name={name}",
+                // 赛事主页与详情页同款右滑入转场
+                enterTransition = {
+                    slideInHorizontally(tween(280)) { it / 3 } + fadeIn(tween(280))
+                },
+                popExitTransition = {
+                    slideOutHorizontally(tween(220)) { it / 3 } + fadeOut(tween(220))
+                },
+                arguments = listOf(
+                    navArgument("tournamentId") { type = NavType.StringType },
+                    navArgument("name") { type = NavType.StringType; defaultValue = "" },
+                ),
+            ) { entry ->
+                TournamentScreen(
+                    tournamentId = entry.arguments?.getString("tournamentId").orEmpty(),
+                    tournamentName = entry.arguments?.getString("name").orEmpty(),
                     onBack = { navController.popBackStack() },
                     onOpenMatch = { navController.navigate("match/$it") },
                 )

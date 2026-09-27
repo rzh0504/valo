@@ -61,6 +61,10 @@ class MatchRepository(
     private val recentCache = TtlCache<String, RecentBigMatchData>(DETAIL_TTL)
     private val pageCache = TtlCache<Int, MatchListData>(WINDOW_TTL)
     private val tournamentCache = TtlCache<String, List<MatchItem>>(WINDOW_TTL)
+    private val fightCache = TtlCache<String, FightHistoryData>(DETAIL_TTL)
+    private val mapForesightCache = TtlCache<String, List<MapRecord>>(DETAIL_TTL)
+    private val stageCache = TtlCache<String, List<TournamentStage>>(WINDOW_TTL)
+    private val integralCache = TtlCache<Pair<String, String>, List<IntegralGroup>>(WINDOW_TTL)
 
     /**
      * 拉取 [startTime, endTime) 时间窗内的比赛（升序）。
@@ -100,6 +104,36 @@ class MatchRepository(
     suspend fun tournamentMatches(tournamentId: String, force: Boolean = false): List<MatchItem> =
         withContext(Dispatchers.IO) {
             tournamentCache.get(tournamentId, force) { fetchTournamentPages(tournamentId) }
+        }
+
+    /** 前瞻 · 历史交手记录，单条缓存 [DETAIL_TTL]。 */
+    suspend fun fightHistory(matchId: String, force: Boolean = false): FightHistoryData =
+        withContext(Dispatchers.IO) {
+            fightCache.get(matchId, force) { api.fightHistory(matchId) }
+        }
+
+    /** 前瞻 · 地图胜率，单条缓存 [DETAIL_TTL]。 */
+    suspend fun mapForesight(matchId: String, force: Boolean = false): List<MapRecord> =
+        withContext(Dispatchers.IO) {
+            mapForesightCache.get(matchId, force) { api.mapForesight(matchId) }
+        }
+
+    /** 赛事阶段与分组，单赛事缓存 [WINDOW_TTL]。 */
+    suspend fun tournamentStages(tournamentId: String, force: Boolean = false): List<TournamentStage> =
+        withContext(Dispatchers.IO) {
+            stageCache.get(tournamentId, force) { api.tournamentStages(tournamentId) }
+        }
+
+    /** 阶段积分榜，按（赛事, 阶段）缓存 [WINDOW_TTL]。 */
+    suspend fun tournamentIntegral(
+        tournamentId: String,
+        stageId: String,
+        force: Boolean = false,
+    ): List<IntegralGroup> =
+        withContext(Dispatchers.IO) {
+            integralCache.get(tournamentId to stageId, force) {
+                api.tournamentIntegral(tournamentId, stageId)
+            }
         }
 
     /** 比赛详情，单条缓存 [DETAIL_TTL]。 */

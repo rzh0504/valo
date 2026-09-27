@@ -34,9 +34,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
@@ -90,6 +92,7 @@ import com.rzh.valo.data.LinkInfo
 import com.rzh.valo.data.MapRoundData
 import com.rzh.valo.data.MatchItem
 import com.rzh.valo.data.MatchStatus
+import com.rzh.valo.data.MapRecord
 import com.rzh.valo.data.Participant
 import com.rzh.valo.data.PlayerMapStats
 import com.rzh.valo.data.PlayerMatchStats
@@ -129,6 +132,7 @@ fun MatchDetailScreen(
     matchId: String,
     onBack: () -> Unit,
     onOpenTeamSchedule: (Participant) -> Unit = {},
+    onOpenTournament: (String, String) -> Unit = { _, _ -> },
 ) {
     val app = LocalContext.current.applicationContext as ValoApplication
     val viewModel: MatchDetailViewModel = viewModel { MatchDetailViewModel(app.container.repository, matchId) }
@@ -190,7 +194,13 @@ fun MatchDetailScreen(
                             )
                         },
                     ) {
-                        DetailContent(item, state.round, onTeamClick = { teamSheet = it })
+                        DetailContent(
+                            item,
+                            state.round,
+                            state.foresight,
+                            onTeamClick = { teamSheet = it },
+                            onOpenTournament = onOpenTournament,
+                        )
                     }
                 }
             }
@@ -219,7 +229,13 @@ fun MatchDetailScreen(
 }
 
 @Composable
-private fun DetailContent(item: MatchItem, round: RoundData, onTeamClick: (Participant) -> Unit) {
+private fun DetailContent(
+    item: MatchItem,
+    round: RoundData,
+    foresight: ForesightUiState?,
+    onTeamClick: (Participant) -> Unit,
+    onOpenTournament: (String, String) -> Unit,
+) {
     val versus = item.versus
     val main = versus?.mainCamp?.firstOrNull()
     val guest = versus?.guestCamp?.firstOrNull()
@@ -228,12 +244,34 @@ private fun DetailContent(item: MatchItem, round: RoundData, onTeamClick: (Parti
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(PAGE_PADDING),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // ---- 头部：赛事与对阵 ----
-        Text(
-            item.group?.nameMain ?: item.tournament?.nameMain.orEmpty(),
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-        )
+        // ---- 头部：赛事与对阵（赛事名可点进赛事主页） ----
+        val tournamentId = item.tournament?.id
+        val tournamentLabel = item.group?.nameMain ?: item.tournament?.nameMain.orEmpty()
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = if (tournamentId != null) {
+                Modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable { onOpenTournament(tournamentId, tournamentLabel) }
+            } else {
+                Modifier
+            },
+        ) {
+            Text(
+                tournamentLabel,
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+            )
+            if (tournamentId != null) {
+                Spacer(Modifier.width(2.dp))
+                Icon(
+                    Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = "进入赛事主页",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
         val parts = listOfNotNull(item.stage?.name, item.scheduleName?.takeIf { it.isNotBlank() })
         if (parts.isNotEmpty()) {
             Spacer(Modifier.height(2.dp))
@@ -281,6 +319,12 @@ private fun DetailContent(item: MatchItem, round: RoundData, onTeamClick: (Parti
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+
+        // ---- 赛前前瞻（未开赛且对阵已定时） ----
+        if (item.status == MatchStatus.SCHEDULED && foresight != null && main != null && guest != null) {
+            Spacer(Modifier.height(24.dp))
+            ForesightSection(foresight, main, guest)
         }
 
         // ---- 地图小局 ----
@@ -980,6 +1024,169 @@ private fun LinkPill(link: LinkInfo) {
                 modifier = Modifier.size(12.dp),
             )
         }
+    }
+}
+
+// ---------- 赛前前瞻 ----------
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ForesightSection(foresight: ForesightUiState, main: Participant, guest: Participant) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            "赛前前瞻",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(10.dp))
+        Card(
+            shape = MaterialTheme.shapes.medium,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        ) {
+            when {
+                foresight.loading -> Box(
+                    Modifier.fillMaxWidth().padding(vertical = 28.dp),
+                    contentAlignment = Alignment.Center,
+                ) { ContainedLoadingIndicator() }
+
+                foresight.failed -> Text(
+                    "前瞻数据加载失败",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),
+                )
+
+                else -> Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    foresight.fight?.let { fight ->
+                        Text(
+                            "历史交手",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.End,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(
+                                    main.displayName,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.End,
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                TeamLogo(main.icon, size = 22)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                "${fight.mainScoreCount?.win ?: 0} : ${fight.guestScoreCount?.win ?: 0}",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                TeamLogo(guest.icon, size = 22)
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    guest.displayName,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        if (fight.matchList.isNotEmpty()) {
+                            Spacer(Modifier.height(4.dp))
+                            fight.matchList.forEach { match -> TeamRecentRow(main, match) }
+                        }
+                    }
+
+                    val maps = foresight.maps.filter { it.hasData }
+                    if (maps.isNotEmpty()) {
+                        if (foresight.fight != null) {
+                            Spacer(Modifier.height(14.dp))
+                            HorizontalDivider()
+                            Spacer(Modifier.height(10.dp))
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "地图胜率",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                "主队",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.width(64.dp),
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                "客队",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.width(64.dp),
+                            )
+                        }
+                        maps.forEach { map -> MapRecordRow(map) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 单张地图的双方历史战绩行，占优一侧高亮 */
+@Composable
+private fun MapRecordRow(map: MapRecord) {
+    val mainBetter = map.mainWins * map.guestMatches > map.guestWins * map.mainMatches
+    val guestBetter = map.guestWins * map.mainMatches > map.mainWins * map.guestMatches
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+    ) {
+        TeamLogo(map.icon, size = 22)
+        Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f)) {
+            Text(map.displayName, style = MaterialTheme.typography.bodyMedium)
+            if (!map.nameEn.isNullOrBlank() && map.nameEn != map.displayName) {
+                Text(
+                    map.nameEn,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Text(
+            "${map.mainWins}胜${map.mainMatches - map.mainWins}负",
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = if (mainBetter) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (mainBetter) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(64.dp),
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            "${map.guestWins}胜${map.guestMatches - map.guestWins}负",
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = if (guestBetter) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (guestBetter) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(64.dp),
+        )
     }
 }
 

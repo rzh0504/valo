@@ -3,6 +3,8 @@ package com.rzh.valo.ui.detail
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rzh.valo.data.FightHistoryData
+import com.rzh.valo.data.MapRecord
 import com.rzh.valo.data.MatchItem
 import com.rzh.valo.data.MatchRepository
 import com.rzh.valo.data.MatchStatus
@@ -25,12 +27,22 @@ data class MatchDetailUiState(
     val item: MatchItem? = null,
     /** 已开赛/完赛时加载的地图小局明细；未开赛为空对象 */
     val round: RoundData = RoundData(),
+    /** 未开赛时的赛前前瞻（历史交手 + 地图胜率）；未开赛以外为 null */
+    val foresight: ForesightUiState? = null,
     val error: String? = null,
     /** 下拉刷新进行中（不遮挡已有内容） */
     val refreshing: Boolean = false,
 ) {
     val hasMaps: Boolean get() = round.list.isNotEmpty()
 }
+
+/** 赛前前瞻：H2H 交手记录与双方分地图历史战绩 */
+data class ForesightUiState(
+    val loading: Boolean = true,
+    val failed: Boolean = false,
+    val fight: FightHistoryData? = null,
+    val maps: List<MapRecord> = emptyList(),
+)
 
 /** 战队近期大赛表现：胜负统计 + 已结束/进行中的比赛（时间倒序），未开始的不展示 */
 data class TeamRecentUiState(
@@ -69,6 +81,7 @@ class MatchDetailViewModel(
             try {
                 val (item, round) = fetchDetail(force = true)
                 _state.update { it.copy(refreshing = false, item = item, round = round, error = null) }
+                if (item.status == MatchStatus.SCHEDULED) loadForesight(force = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -84,11 +97,42 @@ class MatchDetailViewModel(
             try {
                 val (item, round) = fetchDetail(force)
                 _state.update { it.copy(loading = false, item = item, round = round) }
+                if (item.status == MatchStatus.SCHEDULED) loadForesight(force)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w("valo", "比赛详情加载失败 matchId=$matchId", e)
                 _state.update { it.copy(loading = false, error = "加载失败，请重试") }
+            }
+        }
+    }
+
+    /** 未开赛时并发拉取历史交手与地图胜率；单项失败不阻塞另一项 */
+    private fun loadForesight(force: Boolean) {
+        viewModelScope.launch {
+            _state.update { it.copy(foresight = ForesightUiState(loading = true)) }
+            try {
+                val fight = async { runCatching { repository.fightHistory(matchId, force) }.getOrNull() }
+                val maps = async {
+                    runCatching { repository.mapForesight(matchId, force) }.getOrDefault(emptyList())
+                }
+                val fightData = fight.await()
+                val mapData = maps.await()
+                _state.update {
+                    it.copy(
+                        foresight = ForesightUiState(
+                            loading = false,
+                            failed = fightData == null && mapData.isEmpty(),
+                            fight = fightData,
+                            maps = mapData,
+                        ),
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w("valo", "赛前前瞻加载失败 matchId=$matchId", e)
+                _state.update { it.copy(foresight = ForesightUiState(loading = false, failed = true)) }
             }
         }
     }

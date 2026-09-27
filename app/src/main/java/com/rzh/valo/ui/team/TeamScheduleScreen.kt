@@ -88,6 +88,7 @@ fun TeamScheduleScreen(
     teamIcon: String?,
     onBack: () -> Unit,
     onOpenMatch: (String) -> Unit,
+    onOpenTournament: (String, String) -> Unit = { _, _ -> },
 ) {
     val app = LocalContext.current.applicationContext as ValoApplication
     val viewModel: TeamScheduleViewModel = viewModel {
@@ -177,7 +178,7 @@ fun TeamScheduleScreen(
             }
 
             else -> Column(Modifier.fillMaxSize().padding(padding)) {
-                TournamentTabs(state, viewModel)
+                TournamentTabs(state, viewModel, onOpenTournament)
                 val pullState = rememberPullToRefreshState()
                 PullToRefreshBox(
                     isRefreshing = state.refreshing,
@@ -223,9 +224,13 @@ fun TeamScheduleScreen(
     }
 }
 
-/** 赛事 tab：全部 + 该战队出现过的赛事（按最近一场时间倒序） */
+/** 赛事 tab：全部 + 该战队出现过的赛事（按最近一场时间倒序）；选中赛事时可进入赛事主页 */
 @Composable
-private fun TournamentTabs(state: TeamScheduleUiState, viewModel: TeamScheduleViewModel) {
+private fun TournamentTabs(
+    state: TeamScheduleUiState,
+    viewModel: TeamScheduleViewModel,
+    onOpenTournament: (String, String) -> Unit,
+) {
     if (state.tabs.isEmpty()) return
     LazyRow(
         contentPadding = PaddingValues(horizontal = 20.dp),
@@ -248,6 +253,13 @@ private fun TournamentTabs(state: TeamScheduleUiState, viewModel: TeamScheduleVi
                 },
             )
         }
+    }
+    val selectedTab = state.tabs.find { it.tournamentId == state.selectedTabId }
+    if (selectedTab != null) {
+        TextButton(
+            onClick = { onOpenTournament(selectedTab.tournamentId, selectedTab.label) },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("查看「${selectedTab.label}」赛事主页") }
     }
 }
 
