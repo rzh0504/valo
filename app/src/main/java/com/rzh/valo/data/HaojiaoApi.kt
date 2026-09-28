@@ -99,14 +99,6 @@ class HaojiaoApi {
         return exec(Request.Builder().url(url).build())
     }
 
-    /** 前瞻 · 近期大赛表现：双方各自的近 5 场大型赛事与胜负统计（已结束/未开始的比赛均可查） */
-    fun recentBigMatch(matchId: String): RecentBigMatchData {
-        val url = "$BASE/wiki/api/v1/foresight/recent_big_match".toHttpUrl().newBuilder()
-            .addQueryParameter("match_id", matchId)
-            .build()
-        return exec(Request.Builder().url(url).build())
-    }
-
     /** 前瞻 · 历史交手记录：两队 H2H 胜负统计与交手比赛列表 */
     fun fightHistory(matchId: String): FightHistoryData {
         val url = "$BASE/wiki/api/v1/foresight/fight_big_match".toHttpUrl().newBuilder()
@@ -144,6 +136,64 @@ class HaojiaoApi {
             .addQueryParameter("stage_id", stageId)
             .build()
         return exec(Request.Builder().url(url).build())
+    }
+
+    /** 战队基础信息（participant_id 即 team_id） */
+    fun teamBase(teamId: String): TeamBase {
+        val url = "$BASE/wiki/api/v1/team/base".toHttpUrl().newBuilder()
+            .addQueryParameter("team_id", teamId)
+            .addQueryParameter("platform", "web")
+            .build()
+        return exec(Request.Builder().url(url).build())
+    }
+
+    /** 战队名单：现役 / 前成员 / 经理教练组 */
+    fun teamRoster(teamId: String): TeamRoster {
+        val url = "$BASE/wiki/api/v1/team/roster".toHttpUrl().newBuilder()
+            .addQueryParameter("team_id", teamId)
+            .addQueryParameter("platform", "web")
+            .build()
+        return exec(Request.Builder().url(url).build())
+    }
+
+    /** 战队近期数据：场次胜场、地图局胜场、逐图胜率与英雄池（full=false 约 2026 年内） */
+    fun teamStats(teamId: String): TeamStats {
+        val url = "$BASE/wiki/api/v1/team/get_stats".toHttpUrl().newBuilder()
+            .addQueryParameter("team_id", teamId)
+            .addQueryParameter("full", "false")
+            .build()
+        return exec(Request.Builder().url(url).build())
+    }
+
+    /** 全队史总战绩（POST） */
+    fun teamRecord(teamId: String): TeamRecord =
+        exec(
+            Request.Builder()
+                .url("$BASE/wiki/api/v1/tournament/get_team_record")
+                .post(json.encodeToString(TeamStatsRequest(teamId, GAME_ID)).toRequestBody("application/json".toMediaType()))
+                .build()
+        )
+
+    /** 选手数据：队史选手的英雄池与 ACS/KD/ADR/KAST 等个人数据（POST） */
+    fun playerTeamStats(teamId: String): List<PlayerStatsRow> =
+        exec(
+            Request.Builder()
+                .url("$BASE/wiki/api/v1/tournament/get_valorant_stats")
+                .post(json.encodeToString(TeamStatsRequest(teamId, GAME_ID)).toRequestBody("application/json".toMediaType()))
+                .build()
+        )
+
+    /** 赛事名次与奖金 */
+    fun teamReward(teamId: String): List<TeamReward> {
+        val url = "$BASE/wiki/api/v1/team/reward".toHttpUrl().newBuilder()
+            .addQueryParameter("team_id", teamId)
+            .addQueryParameter("full", "false")
+            .addQueryParameter("page", "1")
+            .addQueryParameter("page_size", "10")
+            .addQueryParameter("platform", "web")
+            .build()
+        val data: TeamRewardData = exec(Request.Builder().url(url).build())
+        return data.list
     }
 
     private inline fun <reified T> exec(request: Request): T {

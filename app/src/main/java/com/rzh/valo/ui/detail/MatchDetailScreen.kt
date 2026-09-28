@@ -35,7 +35,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ContainedLoadingIndicator
@@ -46,7 +45,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -56,7 +54,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -99,7 +96,6 @@ import com.rzh.valo.data.PlayerMatchStats
 import com.rzh.valo.data.RoundData
 import com.rzh.valo.data.RoundEntry
 import com.rzh.valo.data.RoundTeam
-import com.rzh.valo.ui.components.LoadingPane
 import com.rzh.valo.ui.components.StatusPill
 import com.rzh.valo.ui.components.TeamLogo
 import java.time.Instant
@@ -131,18 +127,12 @@ private fun Modifier.fullBleed(horizontal: Dp = PAGE_PADDING): Modifier = layout
 fun MatchDetailScreen(
     matchId: String,
     onBack: () -> Unit,
-    onOpenTeamSchedule: (Participant) -> Unit = {},
+    onOpenTeamDetail: (Participant) -> Unit = {},
     onOpenTournament: (String, String) -> Unit = { _, _ -> },
 ) {
     val app = LocalContext.current.applicationContext as ValoApplication
     val viewModel: MatchDetailViewModel = viewModel { MatchDetailViewModel(app.container.repository, matchId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val teamRecent by viewModel.teamRecent.collectAsStateWithLifecycle()
-    var teamSheet by remember { mutableStateOf<Participant?>(null) }
-
-    LaunchedEffect(teamSheet) {
-        teamSheet?.let { viewModel.loadTeamRecent(it) }
-    }
 
     // 内容滚到顶栏下方时顶栏变色分层（scrolledContainerColor 需要 scrollBehavior 才生效）
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -198,32 +188,12 @@ fun MatchDetailScreen(
                             item,
                             state.round,
                             state.foresight,
-                            onTeamClick = { teamSheet = it },
+                            onTeamClick = onOpenTeamDetail,
                             onOpenTournament = onOpenTournament,
                         )
                     }
                 }
             }
-        }
-    }
-
-    teamSheet?.let { team ->
-        ModalBottomSheet(
-            onDismissRequest = {
-                teamSheet = null
-                viewModel.dismissTeamRecent()
-            },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        ) {
-            TeamRecentSheet(
-                team,
-                teamRecent,
-                onOpenSchedule = {
-                    teamSheet = null
-                    viewModel.dismissTeamRecent()
-                    onOpenTeamSchedule(team)
-                },
-            )
         }
     }
 }
@@ -1198,70 +1168,7 @@ private fun MapRateCell(wins: Int, matches: Int, highlight: Boolean) {
     )
 }
 
-// ---------- 战队近期战绩 sheet ----------
-
-/** 点击战队徽标弹出：近期大赛表现（胜负统计 + 已结束/进行中的比赛），未开始的不显示 */
-@Composable
-private fun TeamRecentSheet(team: Participant, state: TeamRecentUiState?, onOpenSchedule: () -> Unit) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .verticalScroll(rememberScrollState()),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
-        ) {
-            TeamLogo(team.icon, size = 40)
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(
-                    team.nameMain?.takeIf { it.isNotBlank() } ?: team.displayName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                val summaryText = state?.summary
-                    ?.takeIf { it.total > 0 }
-                    ?.let { "近${it.total}场 ${it.win}胜 ${it.lose}负" }
-                    ?: "近期大赛表现"
-                Text(
-                    summaryText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        when {
-            state == null || state.loading -> LoadingPane(label = "正在获取近期战绩")
-            state.failed -> Text(
-                "获取战绩失败，请稍后重试",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
-            )
-            state.matches.isEmpty() -> Text(
-                "近期没有已结束的比赛",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
-            )
-            else -> Column {
-                state.matches.forEach { match -> TeamRecentRow(team, match) }
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = onOpenSchedule,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("查看完整赛程")
-        }
-        Spacer(Modifier.height(12.dp))
-    }
-}
+// ---------- H2H 交手列表行 ----------
 
 @Composable
 private fun TeamRecentRow(team: Participant, match: MatchItem) {

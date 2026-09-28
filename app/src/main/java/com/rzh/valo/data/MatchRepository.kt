@@ -58,12 +58,17 @@ class MatchRepository(
     private val windowCache = TtlCache<Pair<Long, Long>, List<MatchItem>>(WINDOW_TTL)
     private val detailCache = TtlCache<String, MatchItem>(DETAIL_TTL)
     private val roundCache = TtlCache<String, RoundData>(DETAIL_TTL)
-    private val recentCache = TtlCache<String, RecentBigMatchData>(DETAIL_TTL)
     private val pageCache = TtlCache<Int, MatchListData>(WINDOW_TTL)
     private val tournamentCache = TtlCache<String, List<MatchItem>>(WINDOW_TTL)
     private val fightCache = TtlCache<String, FightHistoryData>(DETAIL_TTL)
     private val mapForesightCache = TtlCache<String, List<MapRecord>>(DETAIL_TTL)
     private val gameMapCache = TtlCache<String, Set<String>>(DAY)
+    private val teamBaseCache = TtlCache<String, TeamBase>(HALF_DAY_TTL)
+    private val teamRosterCache = TtlCache<String, TeamRoster>(HALF_DAY_TTL)
+    private val teamStatsCache = TtlCache<String, TeamStats>(HALF_DAY_TTL)
+    private val teamRecordCache = TtlCache<String, TeamRecord>(HALF_DAY_TTL)
+    private val playerTeamStatsCache = TtlCache<String, List<PlayerStatsRow>>(HALF_DAY_TTL)
+    private val teamRewardCache = TtlCache<String, List<TeamReward>>(HALF_DAY_TTL)
     private val stageCache = TtlCache<String, List<TournamentStage>>(WINDOW_TTL)
     private val integralCache = TtlCache<Pair<String, String>, List<IntegralGroup>>(WINDOW_TTL)
 
@@ -132,6 +137,38 @@ class MatchRepository(
             api.valorantMaps().filter { it.status == 1 }.map { it.id }.toSet()
         }
 
+    // ---------- 战队详情（低频历史数据，统一 [HALF_DAY_TTL] 缓存） ----------
+
+    suspend fun teamBase(teamId: String, force: Boolean = false): TeamBase =
+        withContext(Dispatchers.IO) {
+            teamBaseCache.get(teamId, force) { api.teamBase(teamId) }
+        }
+
+    suspend fun teamRoster(teamId: String, force: Boolean = false): TeamRoster =
+        withContext(Dispatchers.IO) {
+            teamRosterCache.get(teamId, force) { api.teamRoster(teamId) }
+        }
+
+    suspend fun teamStats(teamId: String, force: Boolean = false): TeamStats =
+        withContext(Dispatchers.IO) {
+            teamStatsCache.get(teamId, force) { api.teamStats(teamId) }
+        }
+
+    suspend fun teamRecord(teamId: String, force: Boolean = false): TeamRecord =
+        withContext(Dispatchers.IO) {
+            teamRecordCache.get(teamId, force) { api.teamRecord(teamId) }
+        }
+
+    suspend fun playerTeamStats(teamId: String, force: Boolean = false): List<PlayerStatsRow> =
+        withContext(Dispatchers.IO) {
+            playerTeamStatsCache.get(teamId, force) { api.playerTeamStats(teamId) }
+        }
+
+    suspend fun teamReward(teamId: String, force: Boolean = false): List<TeamReward> =
+        withContext(Dispatchers.IO) {
+            teamRewardCache.get(teamId, force) { api.teamReward(teamId) }
+        }
+
     /** 赛事阶段与分组，单赛事缓存 [WINDOW_TTL]。 */
     suspend fun tournamentStages(tournamentId: String, force: Boolean = false): List<TournamentStage> =
         withContext(Dispatchers.IO) {
@@ -160,12 +197,6 @@ class MatchRepository(
     suspend fun matchRound(matchId: String, force: Boolean = false): RoundData =
         withContext(Dispatchers.IO) {
             roundCache.get(matchId, force) { api.roundData(matchId) }
-        }
-
-    /** 双方近期大赛表现（前瞻数据），单条缓存 [DETAIL_TTL]。 */
-    suspend fun matchRecent(matchId: String, force: Boolean = false): RecentBigMatchData =
-        withContext(Dispatchers.IO) {
-            recentCache.get(matchId, force) { api.recentBigMatch(matchId) }
         }
 
     /** 保存/读取快照（仅默认时间窗的数据会写入，供小组件使用）；[coveredStart, coveredEnd) 为数据实际覆盖的时间窗。 */
@@ -272,6 +303,7 @@ class MatchRepository(
         // internal：页面层回前台的再验证间隔与它保持一致
         internal const val WINDOW_TTL = 5 * 60_000L
         private const val DETAIL_TTL = 15 * 60_000L
+        private const val HALF_DAY_TTL = 12 * HOUR
         private const val SNAPSHOT_TTL = 24 * 60 * 60_000L
         private const val HOME_SNAPSHOT_TTL = WINDOW_TTL
         // internal：页面层的翻页结束判断（不足一页即最后一页）与它保持一致

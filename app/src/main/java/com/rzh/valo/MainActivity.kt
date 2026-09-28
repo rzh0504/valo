@@ -54,6 +54,7 @@ import com.rzh.valo.ui.detail.MatchDetailScreen
 import com.rzh.valo.ui.home.HomeScreen
 import com.rzh.valo.ui.schedule.ScheduleScreen
 import com.rzh.valo.ui.settings.SettingsScreen
+import com.rzh.valo.ui.team.TeamDetailScreen
 import com.rzh.valo.ui.team.TeamScheduleScreen
 import com.rzh.valo.ui.theme.ValoTheme
 import com.rzh.valo.ui.tournament.TournamentScreen
@@ -159,17 +160,48 @@ private fun AppRoot(pendingMatchId: MutableState<String?>) {
                 MatchDetailScreen(
                     matchId = matchId,
                     onBack = { navController.popBackStack() },
-                    onOpenTeamSchedule = { team ->
+                    onOpenTeamDetail = { team ->
                         val teamId = team.id
                         if (!teamId.isNullOrBlank()) {
                             val name = Uri.encode(team.nameMain.orEmpty().ifBlank { team.displayName })
                             val short = Uri.encode(team.nameShort.orEmpty())
                             val icon = Uri.encode(team.icon.orEmpty())
-                            navController.navigate("team/$teamId?name=$name&short=$short&icon=$icon")
+                            navController.navigate("teaminfo/$teamId?name=$name&short=$short&icon=$icon")
                         }
                     },
                     onOpenTournament = { id, name ->
                         navController.navigate("tournament/$id?name=${Uri.encode(name)}")
+                    },
+                )
+            }
+            composable(
+                "teaminfo/{teamId}?name={name}&short={short}&icon={icon}",
+                // 战队详情页与比赛详情页同款右滑入转场
+                enterTransition = {
+                    slideInHorizontally(tween(280)) { it / 3 } + fadeIn(tween(280))
+                },
+                popExitTransition = {
+                    slideOutHorizontally(tween(220)) { it / 3 } + fadeOut(tween(220))
+                },
+                arguments = listOf(
+                    navArgument("teamId") { type = NavType.StringType },
+                    navArgument("name") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("short") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("icon") { type = NavType.StringType; defaultValue = "" },
+                ),
+            ) { entry ->
+                val teamId = entry.arguments?.getString("teamId").orEmpty()
+                TeamDetailScreen(
+                    teamId = teamId,
+                    teamName = entry.arguments?.getString("name").orEmpty(),
+                    teamShort = entry.arguments?.getString("short").orEmpty(),
+                    teamIcon = entry.arguments?.getString("icon")?.takeIf { it.isNotBlank() },
+                    onBack = { navController.popBackStack() },
+                    onOpenSchedule = {
+                        val name = Uri.encode(entry.arguments?.getString("name").orEmpty())
+                        val short = Uri.encode(entry.arguments?.getString("short").orEmpty())
+                        val icon = Uri.encode(entry.arguments?.getString("icon").orEmpty())
+                        navController.navigate("team/$teamId?name=$name&short=$short&icon=$icon")
                     },
                 )
             }

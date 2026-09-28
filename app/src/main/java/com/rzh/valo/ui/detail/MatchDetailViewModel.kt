@@ -9,12 +9,9 @@ import com.rzh.valo.data.MatchItem
 import com.rzh.valo.data.MatchRepository
 import com.rzh.valo.data.MatchStatus
 import com.rzh.valo.data.Participant
-import com.rzh.valo.data.RecentBigMatchData
 import com.rzh.valo.data.RoundData
-import com.rzh.valo.data.TeamRecentSummary
 import com.rzh.valo.data.VersusInfo
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,14 +41,6 @@ data class ForesightUiState(
     val maps: List<MapRecord> = emptyList(),
 )
 
-/** 战队近期大赛表现：胜负统计 + 已结束/进行中的比赛（时间倒序），未开始的不展示 */
-data class TeamRecentUiState(
-    val loading: Boolean = false,
-    val failed: Boolean = false,
-    val summary: TeamRecentSummary? = null,
-    val matches: List<MatchItem> = emptyList(),
-)
-
 class MatchDetailViewModel(
     private val repository: MatchRepository,
     private val matchId: String,
@@ -59,14 +48,6 @@ class MatchDetailViewModel(
 
     private val _state = MutableStateFlow(MatchDetailUiState())
     val state = _state.asStateFlow()
-
-    private val _teamRecent = MutableStateFlow<TeamRecentUiState?>(null)
-    val teamRecent = _teamRecent.asStateFlow()
-
-    /** foresight 数据按比赛 ID 缓存一份，主/客两队各取各的（side → 状态），再次打开 sheet 秒出 */
-    private var recentData: RecentBigMatchData? = null
-    private val teamRecentBySide = mutableMapOf<Int, TeamRecentUiState>()
-    private var teamRecentJob: Job? = null
 
     init {
         load()
@@ -148,42 +129,6 @@ class MatchDetailViewModel(
         val item = repository.matchDetail(matchId, force)
         val roundData = round.await()
         item to if (item.status == MatchStatus.SCHEDULED) RoundData() else roundData
-    }
-
-    /** 打开战队近期战绩 sheet 时加载； foresight 一次请求含双队数据，按点击的队伍取对应一侧 */
-    fun loadTeamRecent(team: Participant) {
-        teamRecentJob?.cancel()
-        teamRecentJob = viewModelScope.launch {
-            val side = teamSide(_state.value.item?.versus, team)
-            teamRecentBySide[side]?.let {
-                _teamRecent.value = it
-                return@launch
-            }
-            _teamRecent.value = TeamRecentUiState(loading = true)
-            try {
-                val data = recentData ?: repository.matchRecent(matchId).also { recentData = it }
-                val isMain = side != 2
-                val ui = TeamRecentUiState(
-                    summary = if (isMain) data.mainScoreCount else data.guestScoreCount,
-                    matches = (if (isMain) data.mainTeamMatch else data.guestTeamMatch)
-                        .filter { it.status != MatchStatus.SCHEDULED }
-                        .sortedByDescending { it.startTime },
-                )
-                teamRecentBySide[side] = ui
-                _teamRecent.value = ui
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.w("valo", "近期战绩加载失败 matchId=$matchId", e)
-                _teamRecent.value = TeamRecentUiState(failed = true)
-            }
-        }
-    }
-
-    /** 关闭 sheet：取消在途请求并清空状态，数据缓存保留 */
-    fun dismissTeamRecent() {
-        teamRecentJob?.cancel()
-        _teamRecent.value = null
     }
 
     companion object
