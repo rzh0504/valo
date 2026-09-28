@@ -1111,7 +1111,7 @@ private fun ForesightSection(foresight: ForesightUiState, main: Participant, gue
                         }
                     }
 
-                    val maps = foresight.maps.filter { it.hasData }
+                    val maps = foresight.maps
                     if (maps.isNotEmpty()) {
                         if (foresight.fight != null) {
                             Spacer(Modifier.height(14.dp))
@@ -1126,19 +1126,23 @@ private fun ForesightSection(foresight: ForesightUiState, main: Participant, gue
                                 modifier = Modifier.weight(1f),
                             )
                             Text(
-                                "主队",
+                                main.displayName,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.End,
-                                modifier = Modifier.width(64.dp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.width(72.dp),
                             )
                             Spacer(Modifier.width(12.dp))
                             Text(
-                                "客队",
+                                guest.displayName,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.End,
-                                modifier = Modifier.width(64.dp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.width(72.dp),
                             )
                         }
                         maps.forEach { map -> MapRecordRow(map) }
@@ -1149,7 +1153,7 @@ private fun ForesightSection(foresight: ForesightUiState, main: Participant, gue
     }
 }
 
-/** 单张地图的双方历史战绩行，占优一侧高亮 */
+/** 单张地图的双方历史胜率行，占优一侧高亮 */
 @Composable
 private fun MapRecordRow(map: MapRecord) {
     val mainBetter = map.mainWins * map.guestMatches > map.guestWins * map.mainMatches
@@ -1170,24 +1174,28 @@ private fun MapRecordRow(map: MapRecord) {
                 )
             }
         }
-        Text(
-            "${map.mainWins}胜${map.mainMatches - map.mainWins}负",
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = if (mainBetter) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (mainBetter) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.End,
-            modifier = Modifier.width(64.dp),
-        )
+        MapRateCell(map.mainWins, map.mainMatches, mainBetter)
         Spacer(Modifier.width(12.dp))
-        Text(
-            "${map.guestWins}胜${map.guestMatches - map.guestWins}负",
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = if (guestBetter) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (guestBetter) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.End,
-            modifier = Modifier.width(64.dp),
-        )
+        MapRateCell(map.guestWins, map.guestMatches, guestBetter)
     }
+}
+
+/** 单侧胜率单元格：有场次显示百分比，无数据显示占位符 */
+@Composable
+private fun MapRateCell(wins: Int, matches: Int, highlight: Boolean) {
+    Text(
+        if (matches > 0) "${Math.round(wins * 100.0 / matches)}%" else "—",
+        style = MaterialTheme.typography.bodySmall,
+        fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Normal,
+        color = when {
+            highlight -> MaterialTheme.colorScheme.primary
+            matches == 0 -> MaterialTheme.colorScheme.onSurfaceVariant
+            else -> MaterialTheme.colorScheme.onSurface
+        },
+        textAlign = TextAlign.End,
+        maxLines = 1,
+        modifier = Modifier.width(72.dp),
+    )
 }
 
 // ---------- 战队近期战绩 sheet ----------

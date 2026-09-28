@@ -63,6 +63,7 @@ class MatchRepository(
     private val tournamentCache = TtlCache<String, List<MatchItem>>(WINDOW_TTL)
     private val fightCache = TtlCache<String, FightHistoryData>(DETAIL_TTL)
     private val mapForesightCache = TtlCache<String, List<MapRecord>>(DETAIL_TTL)
+    private val gameMapCache = TtlCache<String, Set<String>>(DAY)
     private val stageCache = TtlCache<String, List<TournamentStage>>(WINDOW_TTL)
     private val integralCache = TtlCache<Pair<String, String>, List<IntegralGroup>>(WINDOW_TTL)
 
@@ -112,10 +113,23 @@ class MatchRepository(
             fightCache.get(matchId, force) { api.fightHistory(matchId) }
         }
 
-    /** 前瞻 · 地图胜率，单条缓存 [DETAIL_TTL]。 */
+    /**
+     * 前瞻 · 地图胜率：保留当前竞技图池内的全部地图（含暂无交手数据的）。
+     * 图池列表拉取失败时退回旧行为（仅显示有交手数据的地图）。
+     */
     suspend fun mapForesight(matchId: String, force: Boolean = false): List<MapRecord> =
         withContext(Dispatchers.IO) {
-            mapForesightCache.get(matchId, force) { api.mapForesight(matchId) }
+            mapForesightCache.get(matchId, force) {
+                val records = api.mapForesight(matchId)
+                val rotation = runCatching { rotationMapIds(force) }.getOrNull()
+                if (rotation == null) records.filter { it.hasData } else records.filter { it.id in rotation }
+            }
+        }
+
+    /** 当前竞技图池（map_status=1）的地图 id 集合，按 [DAY] 缓存。 */
+    private suspend fun rotationMapIds(force: Boolean): Set<String> =
+        gameMapCache.get(GAME_MAPS_KEY, force) {
+            api.valorantMaps().filter { it.status == 1 }.map { it.id }.toSet()
         }
 
     /** 赛事阶段与分组，单赛事缓存 [WINDOW_TTL]。 */
@@ -266,5 +280,7 @@ class MatchRepository(
         private const val SORT_ASC = 1
         /** 倒序（2026-09-27 实测：第 1 页返回最新比赛） */
         private const val SORT_DESC = 2
+
+        private const val GAME_MAPS_KEY = "game_maps"
     }
 }

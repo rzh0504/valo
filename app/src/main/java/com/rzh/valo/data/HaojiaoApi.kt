@@ -115,13 +115,17 @@ class HaojiaoApi {
         return exec(Request.Builder().url(url).build())
     }
 
-    /** 前瞻 · 地图胜率：双方在各地图的历史场次与胜场 */
+    /** 前瞻 · 地图胜率：双方在各地图的历史场次与胜场（返回全部地图，按当前图池过滤由仓库层处理） */
     fun mapForesight(matchId: String): List<MapRecord> {
         val url = "$BASE/wiki/api/v1/foresight/valorant_map".toHttpUrl().newBuilder()
             .addQueryParameter("match_id", matchId)
             .build()
         return exec(Request.Builder().url(url).build())
     }
+
+    /** 全地图列表（map_status=1 为当前竞技图池） */
+    fun valorantMaps(): List<GameMap> =
+        exec(Request.Builder().url("$BASE/wiki/api/v1/game/valorant_map").build())
 
     /** 赛事阶段与分组（stage_id 供积分表使用） */
     fun tournamentStages(tournamentId: String): List<TournamentStage> {

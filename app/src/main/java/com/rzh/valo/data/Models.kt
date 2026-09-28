@@ -78,6 +78,16 @@ data class MapRecord(
     val hasData: Boolean get() = mainMatches > 0 || guestMatches > 0
 }
 
+/** 全地图列表（game/valorant_map），map_status：1 = 当前竞技图池内，2 = 已移出 */
+@Serializable
+data class GameMap(
+    @SerialName("unique_id") val id: String = "",
+    @SerialName("name_zh") val nameZh: String? = null,
+    @SerialName("name_en") val nameEn: String? = null,
+    val icon: String? = null,
+    @SerialName("map_status") val status: Int = 0,
+)
+
 // ---------- 赛事（stage_with_group / integral_table） ----------
 
 /** 赛事阶段（stage_id 供积分表、对阵图使用） */
