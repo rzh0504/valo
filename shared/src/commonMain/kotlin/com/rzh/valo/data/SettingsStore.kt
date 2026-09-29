@@ -35,15 +35,11 @@ fun List<MatchItem>.filterByLevels(enabled: Set<String>): List<MatchItem> = filt
 class SettingsStore(private val dataStore: DataStore<Preferences>) {
 
     private val themeKey = intPreferencesKey("theme_mode")
-    private val widgetOpacityKey = floatPreferencesKey("widget_opacity")
     private val matchLevelsKey = stringSetPreferencesKey("match_levels")
 
     val themeMode: Flow<ThemeMode> = dataStore.data.map {
         ThemeMode.from(it[themeKey] ?: ThemeMode.SYSTEM.id)
     }
-
-    /** 桌面小组件背景不透明度（0.2 ~ 1.0） */
-    val widgetOpacity: Flow<Float> = dataStore.data.map { it[widgetOpacityKey] ?: 1f }
 
     /** 赛程中保留的赛事级别；接口未提供级别的比赛始终保留。 */
     val matchLevels: Flow<Set<String>> = dataStore.data.map {
@@ -52,10 +48,6 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setThemeMode(mode: ThemeMode) {
         dataStore.edit { it[themeKey] = mode.id }
-    }
-
-    suspend fun setWidgetOpacity(value: Float) {
-        dataStore.edit { it[widgetOpacityKey] = value.coerceIn(0.2f, 1f) }
     }
 
     suspend fun setMatchLevel(level: String, enabled: Boolean) {

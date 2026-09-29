@@ -20,22 +20,12 @@ class SettingsViewModel(
     val themeMode: StateFlow<ThemeMode> =
         container.settingsStore.themeMode.stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.SYSTEM)
 
-    val widgetOpacity: StateFlow<Float> =
-        container.settingsStore.widgetOpacity.stateIn(viewModelScope, SharingStarted.Eagerly, 1f)
-
     val matchLevels: StateFlow<Set<String>> =
         container.settingsStore.matchLevels.stateIn(viewModelScope, SharingStarted.Eagerly, MATCH_LEVELS.toSet())
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
             container.settingsStore.setThemeMode(mode)
-            onWidgetDataChanged?.invoke()
-        }
-    }
-
-    fun setWidgetOpacity(value: Float) {
-        viewModelScope.launch {
-            container.settingsStore.setWidgetOpacity(value)
             onWidgetDataChanged?.invoke()
         }
     }

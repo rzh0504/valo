@@ -112,7 +112,6 @@ object ScheduleWidget : GlanceAppWidget() {
         val data = withContext(Dispatchers.IO) {
             WidgetData(
                 items = container.repository.loadSnapshot()?.items.orEmpty(),
-                opacity = container.settingsStore.widgetOpacity.first(),
                 matchLevels = container.settingsStore.matchLevels.first(),
                 themeMode = container.settingsStore.themeMode.first(),
             )
@@ -123,10 +122,7 @@ object ScheduleWidget : GlanceAppWidget() {
             ThemeMode.LIGHT -> false
             ThemeMode.DARK -> true
         }
-        val palette = WidgetPalette(
-            if (darkTheme) WidgetDarkColors else WidgetLightColors,
-            data.opacity,
-        )
+        val palette = WidgetPalette(if (darkTheme) WidgetDarkColors else WidgetLightColors)
         // 队标并发加载，Coil 磁盘缓存命中时不发网络
         val rows = coroutineScope {
             widgetRows(data.items, data.matchLevels).map { row ->
@@ -148,7 +144,6 @@ object ScheduleWidget : GlanceAppWidget() {
 
     private data class WidgetData(
         val items: List<MatchItem>,
-        val opacity: Float,
         val matchLevels: Set<String>,
         val themeMode: ThemeMode,
     )
@@ -343,10 +338,10 @@ object ScheduleWidget : GlanceAppWidget() {
     val MATCH_ID_KEY = ActionParameters.Key<String>(MainActivity.EXTRA_MATCH_ID)
 }
 
-/** 小组件配色（沿用 Material3 色板，动态取色与主程序一致） */
-private class WidgetPalette(colors: WidgetPaletteColors, opacity: Float) {
-    val background = ColorProvider(colors.surface.copy(alpha = opacity))
-    val card = ColorProvider(colors.surfaceContainerLow.copy(alpha = opacity))
+/** 小组件配色（中性深浅底 + 蓝强调色，与主程序主题一致） */
+private class WidgetPalette(colors: WidgetPaletteColors) {
+    val background = ColorProvider(colors.surface)
+    val card = ColorProvider(colors.surfaceContainerLow)
     val onCard = ColorProvider(colors.onSurface)
     val secondary = ColorProvider(colors.onSurfaceVariant)
     val primary = ColorProvider(colors.primary)

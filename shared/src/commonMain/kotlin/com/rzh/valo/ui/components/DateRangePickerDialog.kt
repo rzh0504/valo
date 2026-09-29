@@ -34,9 +34,9 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.Forward
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -74,7 +74,7 @@ fun DateRangePickerDialog(
             // ---- 月份行 ----
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { monthAnchor = monthAnchor.minus(1, DateTimeUnit.MONTH) }) {
-                    Icon(MiuixIcons.Back, contentDescription = "上一月")
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "上一月")
                 }
                 Text(
                     "${monthAnchor.year}年${monthAnchor.monthNumber}月",
@@ -84,7 +84,7 @@ fun DateRangePickerDialog(
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
                 IconButton(onClick = { monthAnchor = monthAnchor.plus(1, DateTimeUnit.MONTH) }) {
-                    Icon(MiuixIcons.Forward, contentDescription = "下一月")
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "下一月")
                 }
             }
             Spacer(Modifier.height(6.dp))
