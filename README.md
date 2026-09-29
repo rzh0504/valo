@@ -1,47 +1,69 @@
 # 无畏契约赛程（VALORANT Schedule）
 
-基于号角（haojiao.cc）无畏契约分区 API 的 Android 原生应用：浏览赛程与比赛详情，附桌面小组件。
-Kotlin + Jetpack Compose + Material 3 Expressive（material3 1.5.0-alpha）。
+基于号角（haojiao.cc）无畏契约分区 API 的赛程应用：浏览赛程与比赛详情，附桌面小组件。
+Kotlin Multiplatform（Android + iOS）+ Compose Multiplatform + [miuix](https://github.com/compose-miuix-ui/miuix)（HyperOS 风格组件库）。
 
 > 仅本地展示，无登录、无上传、无服务端；数据版权归号角所有，仅供学习交流使用，请控制请求频率。
 
-## 截图
+## 平台
 
-<p>
-  <img src="screenshot/Screenshot_1788668747.png" width="280" alt="今天：当日赛程按状态分组" />
-  <img src="screenshot/Screenshot_1788668819.png" width="280" alt="详情：逐回合时间轴与选手数据" />
-</p>
+| 平台 | 模块 | 入口 |
+| --- | --- | --- |
+| Android | `androidApp` | `MainActivity`（含 Glance 桌面小组件） |
+| iOS | `iosApp`（Xcode 工程） | `shared` 导出的 `MainViewController` |
+| 共享 | `shared` | 数据层 + 全部 UI（commonMain） |
 
 ## 功能
 
 - **今天**：当日赛程按状态分组（进行中 / 未开始 / 已结束），汇总胶囊可筛选，下拉刷新。
 - **赛程**：默认「过去 7 天 + 未来 14 天」按日分组、自动定位今天；支持按周平移、日期范围查询、状态筛选。
-- **详情**：赛事信息与大比分；已开赛展示每图小局比分、攻防半场、逐回合时间轴与选手数据；点队标看近期战绩。
-- **设置**：主题模式、动态取色、赛事级别过滤（S/A/B/C）、小组件背景不透明度。
-- **小组件**：展示近期 4 场未结束比赛（全部结束时回退最近完赛），点击直达详情，每小时后台刷新一次。
+- **详情**：赛事信息与大比分；已开赛展示每图小局比分、攻防半场、逐回合时间轴与选手数据；点队标进战队主页。
+- **战队**：基础信息、战队/选手数据、地图胜率、赛事名次、完整赛程（按对手搜索 + 时间范围筛选）。
+- **赛事**：阶段筛选、分组积分榜、赛事赛程。
+- **设置**：主题模式、动态取色（Monet / 品牌色种子）、赛事级别过滤（S/A/B/C）、小组件背景不透明度。
+- **小组件**（Android）：展示近期 4 场未结束比赛（全部结束时回退最近完赛），点击直达详情，每小时后台刷新一次。
 
 ## 构建
 
-JDK 17+ 与 Android SDK（compileSdk 37），或 Android Studio 直接打开。
+JDK 21 与 Android SDK（compileSdk 37），或 Android Studio 直接打开。
 
 ```bash
-./gradlew :app:assembleDebug
-# 产物：app/build/outputs/apk/debug/app-debug.apk
+# Android
+./gradlew :androidApp:assembleDebug
+# 产物：androidApp/build/outputs/apk/debug/androidApp-debug.apk
+
+# iOS（需 macOS + Xcode，framework 亦可在这之前于任意平台编译）
+./gradlew :shared:linkDebugFrameworkIosSimulatorArm64
+# 然后打开 iosApp/iosApp.xcodeproj 运行（Run Script 会调 embedAndSignAppleFrameworkForXcode）
+
+# 单元测试
+./gradlew :shared:testAndroidHostTest
 ```
+
+## 技术栈
+
+- Kotlin 2.4 + Compose Multiplatform 1.12 + AGP 9.4（`com.android.kotlin.multiplatform.library`）
+- UI：[miuix](https://github.com/compose-miuix-ui/miuix) 0.9（主题 / 组件 / miuix-nav 导航），图标用 JetBrains 多平台 material-icons
+- 网络：Ktor 3（Android OkHttp / iOS Darwin 引擎），签名与 AES 解密为 expect/actual
+- 存储：DataStore（KMP，`createWithPath`）+ okio 文件快照；图片 Coil 3
+- 日期：kotlinx-datetime + stdlib `kotlin.time`，展示统一 Asia/Shanghai
 
 ## API
 
-数据来自 `https://api.haojiao.cc`，实现见 `data/HaojiaoApi.kt`：
+数据来自 `https://api.haojiao.cc`，实现见 `shared/.../data/HaojiaoApi.kt`：
 
 | 接口                                          | 用途                                 |
 | --------------------------------------------- | ------------------------------------ |
 | `POST /wiki/api/v1/match/list_visitor`        | 比赛列表，按时间窗过滤               |
 | `GET /wiki/api/v1/match/battle_detail`        | 比赛总览                             |
 | `GET /wiki/api/v1/match/get_valorant_round`   | 逐回合明细与选手数据（未开赛返回空） |
-| `GET /wiki/api/v1/foresight/recent_big_match` | 双方近期大赛战绩                     |
+| `GET /wiki/api/v1/foresight/fight_big_match`  | 历史交手（前瞻）                     |
+| `GET /wiki/api/v1/foresight/valorant_map`     | 地图胜率（前瞻）                     |
+| `GET /wiki/api/v1/team/*`                     | 战队信息 / 名单 / 数据 / 名次        |
+| `GET /wiki/api/v1/tournament/*`               | 赛事阶段与积分榜                     |
 
 - 请求头签名：`x-hj-sign = SHA1(SALT + nonce + timestamp)`。
-- `text/plain` 响应为 AES-192-CBC 加密的 Base64，OkHttp 拦截器统一解密。
+- `text/plain` 响应为 AES-192-CBC 加密的 Base64，客户端统一解密（Android `javax.crypto` / iOS CommonCrypto）。
 - 比赛状态：`1 未开始 · 2 进行中 · 3 已结束`；未开赛时对阵双方可能为 null（待定）。
 - 图片相对路径拼接在 `https://files.haojiao.cc` 下。
 
@@ -54,10 +76,12 @@ JDK 17+ 与 Android SDK（compileSdk 37），或 Android Studio 直接打开。
 ## 目录
 
 ```
-app/src/main/java/com/rzh/valo/
-├── MainActivity.kt        # 单 Activity：底部导航 + 详情路由 + 小组件深链
-├── ValoApplication.kt     # AppContainer 手动依赖注入
-├── data/                  # API 客户端、模型、缓存仓库、快照与设置存储
-├── ui/                    # home / schedule / detail / settings + 共享组件与主题
-└── widget/                # Glance 小组件与每小时刷新任务
+shared/src/
+├── commonMain/kotlin/com/rzh/valo/
+│   ├── data/             # Ktor API 客户端、模型、缓存仓库、快照与设置存储、加密 expect
+│   └── ui/               # 主题、导航、home / schedule / detail / team / tournament / settings
+├── androidMain/          # Dispatchers/加密 actual、OnResumeEffect
+└── iosMain/              # CommonCrypto actual、MainViewController
+androidApp/src/main/      # MainActivity、Application、Glance 小组件与刷新任务、res
+iosApp/                   # Xcode 工程（SwiftUI 壳 + ComposeUIViewController）
 ```

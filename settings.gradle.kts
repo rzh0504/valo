@@ -15,4 +15,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "valo"
-include(":app")
+
+include(":shared")
+include(":androidApp")
