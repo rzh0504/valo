@@ -139,19 +139,20 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
                 listState = listState,
                 modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
             )
-        }
-    }
 
-    if (showDatePicker) {
-        DateRangePickerDialog(
-            initialStart = state.customStart,
-            initialEnd = state.customEnd,
-            onConfirm = { start, end ->
-                viewModel.setCustomRange(start, end)
-                showDatePicker = false
-            },
-            onDismiss = { showDatePicker = false },
-        )
+            // miuix 弹层依赖根 Scaffold 注册，必须位于 Scaffold content 子树内
+            if (showDatePicker) {
+                DateRangePickerDialog(
+                    initialStart = state.customStart,
+                    initialEnd = state.customEnd,
+                    onConfirm = { start, end ->
+                        viewModel.setCustomRange(start, end)
+                        showDatePicker = false
+                    },
+                    onDismiss = { showDatePicker = false },
+                )
+            }
+        }
     }
 }
 

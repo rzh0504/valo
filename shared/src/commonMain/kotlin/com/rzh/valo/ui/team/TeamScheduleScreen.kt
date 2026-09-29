@@ -124,50 +124,54 @@ fun TeamScheduleScreen(
             )
         },
     ) { padding ->
-        when {
-            state.loading || (state.loadingMore && state.groups.isEmpty()) -> Box(
-                Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center,
-            ) { LoadingPane(label = "正在获取战队赛程") }
+        // miuix 弹层（OverlayDialog/OverlayBottomSheet）依赖根 Scaffold 注册，
+        // 必须位于 Scaffold content 子树内，否则静默不可见
+        Box(Modifier.fillMaxSize()) {
+            when {
+                state.loading || (state.loadingMore && state.groups.isEmpty()) -> Box(
+                    Modifier.fillMaxSize().padding(padding),
+                    contentAlignment = Alignment.Center,
+                ) { LoadingPane(label = "正在获取战队赛程") }
 
-            state.error != null && state.groups.isEmpty() -> Box(Modifier.fillMaxSize().padding(padding)) {
-                ErrorPane(state.error!!, viewModel::retry)
-            }
+                state.error != null && state.groups.isEmpty() -> Box(Modifier.fillMaxSize().padding(padding)) {
+                    ErrorPane(state.error!!, viewModel::retry)
+                }
 
-            else -> Column(Modifier.fillMaxSize().padding(padding)) {
-                TournamentTabs(state, viewModel, onOpenTournament)
-                PullToRefresh(
-                    isRefreshing = state.refreshing,
-                    onRefresh = viewModel::refresh,
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    TeamList(state, listState, viewModel, onOpenMatch)
+                else -> Column(Modifier.fillMaxSize().padding(padding)) {
+                    TournamentTabs(state, viewModel, onOpenTournament)
+                    PullToRefresh(
+                        isRefreshing = state.refreshing,
+                        onRefresh = viewModel::refresh,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        TeamList(state, listState, viewModel, onOpenMatch)
+                    }
                 }
             }
-        }
-    }
 
-    if (showFilterSheet) {
-        FilterSheet(
-            state = state,
-            viewModel = viewModel,
-            onPickCustomRange = {
-                showFilterSheet = false
-                showRangePicker = true
-            },
-            onDismiss = { showFilterSheet = false },
-        )
-    }
-    if (showRangePicker) {
-        DateRangePickerDialog(
-            initialStart = state.rangeStart,
-            initialEnd = state.rangeEnd,
-            onConfirm = { start, end ->
-                viewModel.setRange("custom", "${formatCnDate(start)} – ${formatCnDate(end)}", start, end)
-                showRangePicker = false
-            },
-            onDismiss = { showRangePicker = false },
-        )
+            if (showFilterSheet) {
+                FilterSheet(
+                    state = state,
+                    viewModel = viewModel,
+                    onPickCustomRange = {
+                        showFilterSheet = false
+                        showRangePicker = true
+                    },
+                    onDismiss = { showFilterSheet = false },
+                )
+            }
+            if (showRangePicker) {
+                DateRangePickerDialog(
+                    initialStart = state.rangeStart,
+                    initialEnd = state.rangeEnd,
+                    onConfirm = { start, end ->
+                        viewModel.setRange("custom", "${formatCnDate(start)} – ${formatCnDate(end)}", start, end)
+                        showRangePicker = false
+                    },
+                    onDismiss = { showRangePicker = false },
+                )
+            }
+        }
     }
 }
 

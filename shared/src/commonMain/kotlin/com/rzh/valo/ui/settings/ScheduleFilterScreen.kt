@@ -30,6 +30,14 @@ import top.yukonga.miuix.kmp.preference.CheckboxPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
+/** 各赛事级别的描述文案 */
+private val LEVEL_SUMMARIES = mapOf(
+    "S" to "各赛区一级联赛、全球赛事",
+    "A" to "各赛区进化者杯、EWC、邀请赛等",
+    "B" to "改变者、全国大赛等",
+    "C" to "ENC、赛区预选赛等",
+)
+
 /** 赛程过滤独立设置页：按赛事级别勾选赛程中显示的比赛 */
 @Composable
 fun ScheduleFilterScreen(onBack: () -> Unit) {
@@ -69,6 +77,7 @@ fun ScheduleFilterScreen(onBack: () -> Unit) {
                     MATCH_LEVELS.forEach { level ->
                         CheckboxPreference(
                             title = level,
+                            summary = LEVEL_SUMMARIES[level],
                             checked = level in matchLevels,
                             onCheckedChange = { viewModel.setMatchLevel(level, it) },
                             checkboxLocation = CheckboxLocation.End,

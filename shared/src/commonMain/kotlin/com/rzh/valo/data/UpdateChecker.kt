@@ -1,11 +1,15 @@
 package com.rzh.valo.data
 
+import com.rzh.valo.util.logWarn
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -30,8 +34,14 @@ fun isNewerVersion(current: String, candidate: String): Boolean {
     return false
 }
 
-/** 通过 GitHub Releases 检查新版本 */
+/** 通过 GitHub Releases 检查新版本；官方 API 在国内时通时断，失败后回落社区镜像 */
 class UpdateChecker(private val repo: String = "rzh0504/valo") {
+
+    /** 依序尝试的接口；镜像仅用于读取 tag_name，跳转链接由本地拼接，不信任响应内容 */
+    private val endpoints = listOf(
+        "https://api.github.com/repos/$repo/releases/latest",
+        "https://gh-proxy.com/https://api.github.com/repos/$repo/releases/latest",
+    )
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -43,18 +53,35 @@ class UpdateChecker(private val repo: String = "rzh0504/valo") {
     private fun HttpClientConfig<*>.config() {
         expectSuccess = false
         install(HttpTimeout) {
-            connectTimeoutMillis = 10_000
-            requestTimeoutMillis = 15_000
+            connectTimeoutMillis = 5_000
+            requestTimeoutMillis = 10_000
         }
     }
 
-    /** 最新正式 Release；网络失败或响应异常时抛出异常，由调用方转为失败态 */
+    /** 最新正式 Release；全部接口失败时抛出最后一个异常，由调用方转为失败态 */
     suspend fun latestRelease(): ReleaseInfo {
-        val resp = client.get("https://api.github.com/repos/$repo/releases/latest")
+        var lastError: Exception? = null
+        for (endpoint in endpoints) {
+            try {
+                return requestLatest(endpoint)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logWarn("valo", "检查更新接口失败：$endpoint", e)
+                lastError = e
+            }
+        }
+        throw lastError ?: ApiException("无可用检查更新接口")
+    }
+
+    private suspend fun requestLatest(endpoint: String): ReleaseInfo {
+        val resp = client.get(endpoint) {
+            header(HttpHeaders.UserAgent, "valo-app")
+        }
         if (!resp.status.isSuccess()) throw ApiException("HTTP ${resp.status.value}")
         val obj = json.parseToJsonElement(resp.bodyAsText()).jsonObject
         val tag = obj["tag_name"]?.jsonPrimitive?.content ?: throw ApiException("响应缺少 tag_name")
-        val url = obj["html_url"]?.jsonPrimitive?.content ?: "https://github.com/$repo/releases/latest"
-        return ReleaseInfo(version = tag.removePrefix("v"), url = url)
+        return ReleaseInfo(version = tag.removePrefix("v"), url = "https://github.com/$repo/releases/latest")
     }
 }
+
