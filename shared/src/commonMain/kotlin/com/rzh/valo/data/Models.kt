@@ -466,6 +466,9 @@ data class PlayerMapStats(
     val kills: Int = 0,
     val deaths: Int = 0,
     val assists: Int = 0,
+    /** 首杀 / 首死（接口未统计时为 0） */
+    val fk: Int = 0,
+    val fd: Int = 0,
     val sort: Int = 0,
 )
 
@@ -485,4 +488,7 @@ data class PlayerMatchStats(
     val kills: Int = 0,
     val deaths: Int = 0,
     val assists: Int = 0,
+    /** 首杀 / 首死（接口未统计时为 0） */
+    val fk: Int = 0,
+    val fd: Int = 0,
 )

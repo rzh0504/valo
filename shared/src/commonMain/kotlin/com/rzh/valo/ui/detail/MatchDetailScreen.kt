@@ -14,10 +14,10 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -88,10 +88,10 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
@@ -125,7 +125,7 @@ fun MatchDetailScreen(
     val scrollBehavior = MiuixScrollBehavior()
     Scaffold(
         topBar = {
-            TopAppBar(
+            SmallTopAppBar(
                 title = "比赛详情",
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
@@ -276,7 +276,7 @@ private fun DetailContent(
         // ---- 地图小局 ----
         if (round.list.isNotEmpty() || round.all.isNotEmpty()) {
             Spacer(Modifier.height(24.dp))
-            MapsSection(round)
+            MapsSection(round, versus?.mainScore, versus?.guestScore)
         } else if (item.status == MatchStatus.SCHEDULED) {
             Spacer(Modifier.height(16.dp))
             Text(
@@ -322,12 +322,18 @@ private fun HorizontalDivider() {
 // ---------- 地图与小局 ----------
 
 @Composable
-private fun MapsSection(round: RoundData) {
+private fun MapsSection(
+    round: RoundData,
+    mainSeriesScore: String?,
+    guestSeriesScore: String?,
+) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(round) { selected = 0 }
-    val tabCount = round.list.size + if (round.all.isNotEmpty()) 1 else 0
+    // 全场数据固定为第一个页签，地图页签依次后移
+    val mapOffset = if (round.all.isNotEmpty()) 1 else 0
+    val tabCount = round.list.size + mapOffset
     val index = selected.coerceIn(0, tabCount - 1)
-    val fullMatchIndex = round.list.size
+    val fullMatchIndex = if (round.all.isNotEmpty()) 0 else -1
 
     Column(Modifier.fillMaxWidth()) {
         Text(
@@ -341,23 +347,21 @@ private fun MapsSection(round: RoundData) {
             contentPadding = PaddingValues(horizontal = PAGE_PADDING),
             modifier = Modifier.align(Alignment.CenterHorizontally).fullBleed(),
         ) {
-            itemsIndexed(round.list) { i, mapData ->
-                MapPill(
-                    label = mapData.map?.displayName ?: "地图 ${i + 1}",
-                    score = "${mapData.mainScore?.total ?: 0} : ${mapData.guestScore?.total ?: 0}",
-                    selected = i == index,
-                    onClick = { selected = i },
-                )
-            }
             if (round.all.isNotEmpty()) {
-                item {
+                item(key = "full") {
                     MapPill(
                         label = "全场数据",
-                        score = "${round.all.size} 人",
                         selected = index == fullMatchIndex,
                         onClick = { selected = fullMatchIndex },
                     )
                 }
+            }
+            itemsIndexed(round.list) { i, mapData ->
+                MapPill(
+                    label = mapData.map?.displayName ?: "地图 ${i + 1}",
+                    selected = index == i + mapOffset,
+                    onClick = { selected = i + mapOffset },
+                )
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -367,45 +371,59 @@ private fun MapsSection(round: RoundData) {
             label = "mapSwitch",
         ) { i ->
             if (i == fullMatchIndex) {
-                FullMatchPanel(
-                    all = round.all,
-                    mainTeam = round.list.firstOrNull()?.mainTeam,
-                    guestTeam = round.list.firstOrNull()?.guestTeam,
-                )
+                val first = round.list.firstOrNull()
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TeamStatsCard(
+                        team = first?.mainTeam,
+                        score = mainSeriesScore,
+                        columns = FULL_STAT_COLUMNS,
+                        rows = fullTeamRows(round.all, main = true),
+                    )
+                    TeamStatsCard(
+                        team = first?.guestTeam,
+                        score = guestSeriesScore,
+                        columns = FULL_STAT_COLUMNS,
+                        rows = fullTeamRows(round.all, main = false),
+                    )
+                }
             } else {
-                MapPanel(round.list[i])
+                val map = round.list[i - mapOffset]
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    MapPanel(map)
+                    TeamStatsCard(
+                        team = map.mainTeam,
+                        score = map.mainScore?.total?.toString(),
+                        columns = MAP_STAT_COLUMNS,
+                        rows = mapTeamRows(map, main = true),
+                    )
+                    TeamStatsCard(
+                        team = map.guestTeam,
+                        score = map.guestScore?.total?.toString(),
+                        columns = MAP_STAT_COLUMNS,
+                        rows = mapTeamRows(map, main = false),
+                    )
+                }
             }
         }
     }
 }
 
+/** 地图选择药丸（Miaopu 风格）：单行文案，选中淡蓝底蓝字，未选中灰底 */
 @Composable
-private fun MapPill(label: String, score: String, selected: Boolean, onClick: () -> Unit) {
+private fun MapPill(label: String, selected: Boolean, onClick: () -> Unit) {
     val scheme = MiuixTheme.colorScheme
-    Card(
-        onClick = onClick,
-        cornerRadius = 12.dp,
-        insideMargin = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-        colors = CardDefaults.defaultColors(
-            color = if (selected) scheme.primaryContainer else scheme.surfaceContainer,
-        ),
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = if (selected) scheme.primary.copy(alpha = 0.12f) else scheme.surfaceContainerHighest,
+        contentColor = if (selected) scheme.primary else scheme.onSurface,
+        modifier = Modifier.clickable(onClick = onClick),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                label,
-                style = MiuixTheme.textStyles.footnote1,
-                color = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
-            )
-            Text(
-                score,
-                style = MiuixTheme.textStyles.footnote1,
-                color = if (selected) {
-                    scheme.onPrimaryContainer.copy(alpha = 0.8f)
-                } else {
-                    scheme.onSurfaceVariantSummary
-                },
-            )
-        }
+        Text(
+            label,
+            style = MiuixTheme.textStyles.body2,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
     }
 }
 
@@ -449,12 +467,6 @@ private fun MapPanel(map: MapRoundData) {
                 RoundGrid(map)
                 Spacer(Modifier.height(10.dp))
                 RoundGridLegend(showUnplayed = !map.isEnd)
-            }
-            if (map.players.isNotEmpty()) {
-                Spacer(Modifier.height(14.dp))
-                HorizontalDivider()
-                Spacer(Modifier.height(8.dp))
-                PlayerTable(map)
             }
         }
     }
@@ -702,175 +714,179 @@ private fun WinIcon(mode: Int, size: Int, tint: Color = Color.White) {
     }
 }
 
-/** 本图选手数据：按队伍分组的单列表，ID 不截断，顶部带 KDA/ACS 列标签 */
-@Composable
-private fun PlayerTable(map: MapRoundData) {
-    val mainPlayers = map.players.filter { it.isMain }.sortedByDescending { it.acs ?: 0.0 }
-    val guestPlayers = map.players.filter { !it.isMain }.sortedByDescending { it.acs ?: 0.0 }
-    Column {
-        PlayerGroupHeader(map.mainTeam, listOf("KDA" to 72.dp, "ACS" to 38.dp))
-        mainPlayers.forEach { PlayerRow(it) }
-        Spacer(Modifier.height(10.dp))
-        PlayerGroupHeader(map.guestTeam, listOf("KDA" to 72.dp, "ACS" to 38.dp))
-        guestPlayers.forEach { PlayerRow(it) }
-    }
-}
+// ---------- 数据面板：分队卡片 + 固定选手列 + 可横向滚动的数据列 ----------
 
-@Composable
-private fun PlayerGroupHeader(team: RoundTeam?, columns: List<Pair<String, Dp>>) {
-    val scheme = MiuixTheme.colorScheme
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-    ) {
-        TeamLogo(team?.icon, size = 18)
-        Spacer(Modifier.width(6.dp))
-        Text(
-            team?.short ?: team?.name ?: "队伍",
-            style = MiuixTheme.textStyles.footnote1,
-            color = scheme.onSurfaceVariantSummary,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.weight(1f),
-        )
-        columns.forEachIndexed { index, (label, width) ->
-            if (index == 0) Spacer(Modifier.width(10.dp)) else Spacer(Modifier.width(14.dp))
-            Text(
-                label,
-                style = MiuixTheme.textStyles.footnote2,
-                color = scheme.onSurfaceVariantSummary,
-                textAlign = TextAlign.End,
-                modifier = Modifier.width(width),
-            )
-        }
-    }
-}
+/** 数据列定义：表头文案 + 固定列宽 */
+private data class StatColumn(val label: String, val width: Dp = 68.dp)
 
-@Composable
-private fun PlayerRow(player: PlayerMapStats) {
-    val scheme = MiuixTheme.colorScheme
-    val nick = player.career?.idName?.takeIf { it.isNotBlank() } ?: player.player?.realName.orEmpty()
-    val kda = "${player.kills}/${player.deaths}/${player.assists}"
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-    ) {
-        TeamLogo(player.hero?.icon, size = 24, shape = RoundedCornerShape(8.dp))
-        Spacer(Modifier.width(10.dp))
-        Text(
-            nick,
-            style = MiuixTheme.textStyles.body1,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            kda,
-            style = MiuixTheme.textStyles.body2,
-            color = scheme.onSurfaceVariantSummary,
-            textAlign = TextAlign.End,
-            modifier = Modifier.width(72.dp),
-        )
-        Spacer(Modifier.width(14.dp))
-        Text(
-            player.acs?.formatFixed(0) ?: "—",
-            style = MiuixTheme.textStyles.body1,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.End,
-            modifier = Modifier.width(38.dp),
-        )
-    }
-}
+/** 表格一行的视图数据：左侧英雄区 + 姓名 + 各数据列取值 */
+private data class StatsRow(val heroIcons: List<String?>, val name: String, val cells: List<String>)
+
+/** 单图数据列 */
+private val MAP_STAT_COLUMNS = listOf(
+    StatColumn("K/D/A"),
+    StatColumn("首杀/首死"),
+    StatColumn("ACS"),
+    StatColumn("ADR"),
+    StatColumn("KAST"),
+    StatColumn("HS"),
+)
+
+/** 全场数据列：末尾多一个回合数 */
+private val FULL_STAT_COLUMNS = MAP_STAT_COLUMNS + StatColumn("回合")
+
+/** 接口对未统计的数值/百分比字段回 0，统一显示为 — */
+private fun Double?.statText(percent: Boolean = false): String =
+    if (this == null || this <= 0.0) "—" else formatFixed(0) + if (percent) "%" else ""
+
+private fun PlayerMapStats.toStatsRow(): StatsRow = StatsRow(
+    heroIcons = listOf(hero?.icon),
+    name = career?.idName?.takeIf { it.isNotBlank() } ?: player?.realName.orEmpty(),
+    cells = listOf(
+        "$kills/$deaths/$assists",
+        "$fk/$fd",
+        acs.statText(),
+        adr.statText(),
+        kast.statText(percent = true),
+        hs.statText(percent = true),
+    ),
+)
+
+private fun PlayerMatchStats.toStatsRow(): StatsRow = StatsRow(
+    heroIcons = hero.map { it.icon },
+    name = career?.idName?.takeIf { it.isNotBlank() } ?: player?.realName.orEmpty(),
+    cells = listOf(
+        "$kills/$deaths/$assists",
+        "$fk/$fd",
+        acs.statText(),
+        adr.statText(),
+        kast.statText(percent = true),
+        hs.statText(percent = true),
+        rounds.toString(),
+    ),
+)
+
+/** 单队选手行（按 ACS 降序） */
+private fun mapTeamRows(map: MapRoundData, main: Boolean): List<StatsRow> =
+    map.players.filter { it.isMain == main }.sortedByDescending { it.acs ?: 0.0 }.map { it.toStatsRow() }
+
+private fun fullTeamRows(all: List<PlayerMatchStats>, main: Boolean): List<StatsRow> =
+    all.filter { it.isMain == main }.sortedByDescending { it.acs ?: 0.0 }.map { it.toStatsRow() }
 
 /**
- * 全场比赛汇总，与地图小局复用同一数据容器。
- * 表格按最宽的选手 ID 撑开列宽（IntrinsicSize.Max），ID 不截断；
- * 超出卡片宽度时可横向滚动查看全部数据列。
+ * 单队数据卡（参照喵扑比赛数据面板）：队头为队标 + 队名 + 比分；
+ * 「选手」列固定不滚动，仅数据列可横向滚动，姓名始终可见；斑马行分隔。
  */
 @Composable
-private fun FullMatchPanel(all: List<PlayerMatchStats>, mainTeam: RoundTeam?, guestTeam: RoundTeam?) {
+private fun TeamStatsCard(
+    team: RoundTeam?,
+    score: String?,
+    columns: List<StatColumn>,
+    rows: List<StatsRow>,
+) {
     val scheme = MiuixTheme.colorScheme
-    val mainPlayers = all.filter { it.isMain }.sortedByDescending { it.acs ?: 0.0 }
-    val guestPlayers = all.filter { !it.isMain }.sortedByDescending { it.acs ?: 0.0 }
+    val statsScroll = rememberScrollState()
+    val headerBand = scheme.onSurface.copy(alpha = 0.035f)
+    val oddRow = scheme.onSurface.copy(alpha = 0.025f)
     Card(
         cornerRadius = 16.dp,
+        insideMargin = PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(color = scheme.surfaceContainer),
     ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .horizontalScroll(rememberScrollState()),
-        ) {
-            Column(Modifier.width(IntrinsicSize.Max)) {
-                PlayerGroupHeader(mainTeam, listOf("KDA" to 72.dp, "ADR" to 42.dp, "ACS" to 42.dp))
-                mainPlayers.forEach { PlayerMatchRow(it) }
-                Spacer(Modifier.height(10.dp))
-                PlayerGroupHeader(guestTeam, listOf("KDA" to 72.dp, "ADR" to 42.dp, "ACS" to 42.dp))
-                guestPlayers.forEach { PlayerMatchRow(it) }
+        Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            ) {
+                TeamLogo(team?.icon, size = 22)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    team?.short ?: team?.name ?: "队伍",
+                    style = MiuixTheme.textStyles.body1,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (score != null) {
+                    Text(score, style = MiuixTheme.textStyles.body1, fontWeight = FontWeight.Bold)
+                }
             }
+            Row(Modifier.fillMaxWidth()) {
+                Column(Modifier.width(132.dp)) {
+                    Box(
+                        Modifier.fillMaxWidth().height(32.dp).background(headerBand),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        Text(
+                            "选手",
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = scheme.onSurfaceVariantSummary,
+                            modifier = Modifier.padding(start = 12.dp),
+                        )
+                    }
+                    rows.forEachIndexed { index, row ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(36.dp)
+                                .background(if (index % 2 == 1) oddRow else Color.Transparent)
+                                .padding(start = 12.dp),
+                        ) {
+                            Box(Modifier.width(40.dp)) {
+                                row.heroIcons.take(3).forEachIndexed { j, icon ->
+                                    TeamLogo(
+                                        icon,
+                                        size = 18,
+                                        shape = RoundedCornerShape(6.dp),
+                                        modifier = Modifier.offset(x = (j * 12).dp).zIndex(-j.toFloat()),
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                row.name,
+                                style = MiuixTheme.textStyles.footnote1,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+                Column(Modifier.weight(1f).horizontalScroll(statsScroll)) {
+                    Row(Modifier.height(32.dp)) {
+                        columns.forEach { column ->
+                            StatCell(column.label, header = true, width = column.width)
+                        }
+                    }
+                    rows.forEachIndexed { index, row ->
+                        Row(
+                            Modifier
+                                .height(36.dp)
+                                .background(if (index % 2 == 1) oddRow else Color.Transparent),
+                        ) {
+                            row.cells.forEach { StatCell(it, header = false, width = 68.dp) }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
         }
     }
 }
 
 @Composable
-private fun PlayerMatchRow(player: PlayerMatchStats) {
+private fun StatCell(value: String, header: Boolean, width: Dp) {
     val scheme = MiuixTheme.colorScheme
-    val nick = player.career?.idName?.takeIf { it.isNotBlank() } ?: player.player?.realName.orEmpty()
-    val kda = "${player.kills}/${player.deaths}/${player.assists}"
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-    ) {
-        Box(Modifier.width(44.dp)) {
-            player.hero.take(3).forEachIndexed { i, hero ->
-                TeamLogo(
-                    hero.icon,
-                    size = 18,
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier.offset(x = (i * 13).dp).zIndex(-i.toFloat()),
-                )
-            }
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                nick,
-                style = MiuixTheme.textStyles.body1,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                "${player.rounds} 回合",
-                style = MiuixTheme.textStyles.footnote2,
-                color = scheme.onSurfaceVariantSummary,
-            )
-        }
-        Spacer(Modifier.width(10.dp))
+    Box(Modifier.width(width).fillMaxHeight(), contentAlignment = Alignment.Center) {
         Text(
-            kda,
-            style = MiuixTheme.textStyles.body2,
-            color = scheme.onSurfaceVariantSummary,
-            textAlign = TextAlign.End,
-            modifier = Modifier.width(72.dp),
-        )
-        Spacer(Modifier.width(14.dp))
-        Text(
-            player.adr?.formatFixed(0) ?: "—",
-            style = MiuixTheme.textStyles.body2,
-            color = scheme.onSurfaceVariantSummary,
-            textAlign = TextAlign.End,
-            modifier = Modifier.width(42.dp),
-        )
-        Spacer(Modifier.width(14.dp))
-        Text(
-            player.acs?.formatFixed(0) ?: "—",
-            style = MiuixTheme.textStyles.body1,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.End,
-            modifier = Modifier.width(42.dp),
+            value,
+            style = MiuixTheme.textStyles.footnote1,
+            fontWeight = if (header) FontWeight.Normal else FontWeight.Medium,
+            color = if (header) scheme.onSurfaceVariantSummary else scheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
