@@ -31,4 +31,12 @@ sealed interface Route : NavKey {
 
     @Serializable
     data class Tournament(val tournamentId: String, val name: String = "") : Route
+
+    /** 设置 → 赛程过滤独立页 */
+    @Serializable
+    data object ScheduleFilter : Route
+
+    /** 设置 → 关于页 */
+    @Serializable
+    data object About : Route
 }

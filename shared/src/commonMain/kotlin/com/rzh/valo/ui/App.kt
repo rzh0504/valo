@@ -1,18 +1,20 @@
 package com.rzh.valo.ui
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
@@ -24,16 +26,21 @@ import com.rzh.valo.data.ThemeMode
 import com.rzh.valo.ui.detail.MatchDetailScreen
 import com.rzh.valo.ui.home.HomeScreen
 import com.rzh.valo.ui.schedule.ScheduleScreen
+import com.rzh.valo.ui.settings.AboutScreen
+import com.rzh.valo.ui.settings.ScheduleFilterScreen
 import com.rzh.valo.ui.settings.SettingsScreen
 import com.rzh.valo.ui.team.TeamDetailScreen
 import com.rzh.valo.ui.team.TeamScheduleScreen
 import com.rzh.valo.ui.theme.ValoTheme
 import com.rzh.valo.ui.tournament.TournamentScreen
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
+import top.yukonga.miuix.kmp.utils.PagerNavigationSpringSpec
+import top.yukonga.miuix.kmp.utils.springAnimateToPage
 
 /** 小组件点击比赛行携带的深链；由平台入口写入，App 消费后清空 */
 class DeepLinkState {
@@ -101,6 +108,8 @@ private fun AppRoot(deepLink: DeepLinkState) {
             MainTabs(
                 onOpenMatch = openMatch,
                 onOpenTournament = openTournament,
+                onOpenScheduleFilter = { navigator.push(Route.ScheduleFilter) },
+                onOpenAbout = { navigator.push(Route.About) },
             )
         }
         entry<Route.Match> { route ->
@@ -155,6 +164,12 @@ private fun AppRoot(deepLink: DeepLinkState) {
                 onOpenMatch = openMatch,
             )
         }
+        entry<Route.ScheduleFilter> {
+            ScheduleFilterScreen(onBack = { navigator.pop() })
+        }
+        entry<Route.About> {
+            AboutScreen(onBack = { navigator.pop() })
+        }
     }
 }
 
@@ -162,22 +177,39 @@ private fun AppRoot(deepLink: DeepLinkState) {
 private fun MainTabs(
     onOpenMatch: (String) -> Unit,
     onOpenTournament: (String, String) -> Unit,
+    onOpenScheduleFilter: () -> Unit,
+    onOpenAbout: () -> Unit,
 ) {
-    var selectedTab by rememberSaveable { mutableStateOf(0) }
-    val holder = rememberSaveableStateHolder()
+    // 页签即 pager 页：点底部栏弹簧滑动到目标页（miuix example 惯用形态），
+    // 页间也支持横滑；各页 rememberSaveable 状态由 pager 内置的 holder 保管
+    val pagerState = rememberPagerState(pageCount = { 3 })
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         bottomBar = {
-            MainNavigationBar(currentIndex = selectedTab, onSelect = { selectedTab = it })
+            MainNavigationBar(
+                // targetPage 在点击动画开始时即指向目标页、手势翻页过半后跟随，高亮始终领先于落位
+                currentIndex = pagerState.targetPage,
+                onSelect = { index -> scope.launch { pagerState.springAnimateToPage(index) } },
+            )
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
-            holder.SaveableStateProvider("tab_$selectedTab") {
-                when (selectedTab) {
-                    0 -> HomeScreen(onOpenMatch = onOpenMatch)
-                    1 -> ScheduleScreen(onOpenMatch = onOpenMatch)
-                    else -> SettingsScreen()
-                }
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()),
+            flingBehavior = PagerDefaults.flingBehavior(
+                state = pagerState,
+                snapAnimationSpec = PagerNavigationSpringSpec,
+            ),
+            verticalAlignment = Alignment.Top,
+        ) { page ->
+            when (page) {
+                0 -> HomeScreen(onOpenMatch = onOpenMatch)
+                1 -> ScheduleScreen(onOpenMatch = onOpenMatch)
+                else -> SettingsScreen(
+                    onOpenScheduleFilter = onOpenScheduleFilter,
+                    onOpenAbout = onOpenAbout,
+                )
             }
         }
     }

@@ -120,7 +120,6 @@ private fun HomeContent(state: HomeUiState, viewModel: HomeViewModel, onOpenMatc
                 title = title,
                 matches = matches,
                 onOpenMatch = onOpenMatch,
-                emphasized = status == MatchStatus.LIVE,
             )
         }
 
@@ -143,17 +142,15 @@ private fun androidx.compose.foundation.lazy.LazyListScope.section(
     title: String,
     matches: List<com.rzh.valo.data.MatchItem>,
     onOpenMatch: (String) -> Unit,
-    emphasized: Boolean = false,
 ) {
     if (matches.isEmpty()) return
     item(key = "header_$key") {
-        SectionTitle(title, count = matches.size, emphasized = emphasized)
+        SectionTitle(title, count = matches.size)
     }
     items(matches, key = { "home_${key}_${it.id}" }) { match ->
         MatchCard(
             item = match,
             onClick = { onOpenMatch(match.id) },
-            emphasized = emphasized && match.isLive,
             showCountdown = true,
             modifier = Modifier.animateItem(),
         )
@@ -216,14 +213,14 @@ private fun SummaryChip(label: String, count: Int, selected: Boolean, onClick: (
 }
 
 @Composable
-private fun SectionTitle(title: String, count: Int, emphasized: Boolean) {
+private fun SectionTitle(title: String, count: Int) {
     val scheme = MiuixTheme.colorScheme
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)) {
         Text(
             title,
             style = MiuixTheme.textStyles.headline2,
             fontWeight = FontWeight.SemiBold,
-            color = if (emphasized) scheme.primary else scheme.onSurface,
+            color = scheme.onSurface,
         )
         Spacer(Modifier.width(6.dp))
         Text(

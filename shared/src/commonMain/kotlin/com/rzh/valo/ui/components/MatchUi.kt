@@ -104,10 +104,9 @@ fun TeamLogo(path: String?, size: Int, modifier: Modifier = Modifier, shape: Sha
 }
 
 @Composable
-fun StatusPill(status: Int, modifier: Modifier = Modifier, emphasized: Boolean = false) {
+fun StatusPill(status: Int, modifier: Modifier = Modifier) {
     val scheme = MiuixTheme.colorScheme
     val (label, container, content) = when {
-        status == MatchStatus.LIVE && emphasized -> Triple("进行中", scheme.primary, scheme.onPrimary)
         status == MatchStatus.LIVE -> Triple("进行中", scheme.primaryContainer, scheme.onPrimaryContainer)
         status == MatchStatus.FINISHED -> Triple("已结束", scheme.surfaceContainerHighest, scheme.onSurfaceVariantSummary)
         else -> Triple("未开始", scheme.secondaryContainer, scheme.onSecondaryContainer)
@@ -209,7 +208,6 @@ fun MatchCard(
     item: MatchItem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    emphasized: Boolean = false,
     /** 未开赛时在时间旁追加相对开赛时间（仅今天页使用，跨天窗口无意义） */
     showCountdown: Boolean = false,
 ) {
@@ -223,9 +221,6 @@ fun MatchCard(
     Card(
         onClick = onClick,
         cornerRadius = 16.dp,
-        colors = CardDefaults.defaultColors(
-            color = if (emphasized) scheme.primaryContainer else scheme.surfaceContainer,
-        ),
         pressFeedbackType = PressFeedbackType.Sink,
         modifier = modifier,
     ) {
@@ -234,10 +229,10 @@ fun MatchCard(
                 Text(
                     formatTime(item.startTime),
                     style = MiuixTheme.textStyles.footnote1,
-                    color = if (emphasized) scheme.onPrimaryContainer else scheme.onSurfaceVariantSummary,
+                    color = scheme.onSurfaceVariantSummary,
                 )
                 Spacer(Modifier.width(8.dp))
-                StatusPill(item.status, emphasized = emphasized)
+                StatusPill(item.status)
                 if (showCountdown && item.status == MatchStatus.SCHEDULED) {
                     relativeStartLabel(item.startTime)?.let { label ->
                         Spacer(Modifier.width(8.dp))
@@ -252,7 +247,7 @@ fun MatchCard(
                 Text(
                     "BO${item.boNum}",
                     style = MiuixTheme.textStyles.footnote1,
-                    color = if (emphasized) scheme.onPrimaryContainer else scheme.onSurfaceVariantSummary,
+                    color = scheme.onSurfaceVariantSummary,
                 )
             }
             Spacer(Modifier.height(10.dp))
@@ -267,11 +262,7 @@ fun MatchCard(
             Text(
                 subtitle(item),
                 style = MiuixTheme.textStyles.body2,
-                color = if (emphasized) {
-                    scheme.onPrimaryContainer.copy(alpha = 0.75f)
-                } else {
-                    scheme.onSurfaceVariantSummary
-                },
+                color = scheme.onSurfaceVariantSummary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
