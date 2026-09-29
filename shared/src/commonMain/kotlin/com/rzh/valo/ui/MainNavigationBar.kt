@@ -27,7 +27,7 @@ private val TABS = listOf(
 /** 底部页签（今天 / 赛程 / 设置），沿用选中态双图标 */
 @Composable
 internal fun MainNavigationBar(currentIndex: Int, onSelect: (Int) -> Unit) {
-    NavigationBar {
+    NavigationBar(showDivider = false) {
         TABS.forEachIndexed { index, tab ->
             NavigationBarItem(
                 selected = currentIndex == index,

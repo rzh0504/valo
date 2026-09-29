@@ -68,7 +68,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
-/** 品牌色（与 shared/ui/theme 保持一致的 VALORANT 红派生），小组件固定使用 */
+/** 小组件配色：中性深浅底 + miuix 默认蓝强调色（与 shared/ui/theme 一致） */
 private data class WidgetPaletteColors(
     val surface: Color,
     val surfaceContainerLow: Color,
@@ -78,19 +78,19 @@ private data class WidgetPaletteColors(
 )
 
 private val WidgetLightColors = WidgetPaletteColors(
-    surface = Color(0xFFFFF8F6),
-    surfaceContainerLow = Color(0xFFF7F0EE),
-    onSurface = Color(0xFF201A19),
-    onSurfaceVariant = Color(0xFF534341),
-    primary = Color(0xFFA3382F),
+    surface = Color(0xFFF7F8FA),
+    surfaceContainerLow = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF191919),
+    onSurfaceVariant = Color(0xFF757575),
+    primary = Color(0xFF3482FF),
 )
 
 private val WidgetDarkColors = WidgetPaletteColors(
-    surface = Color(0xFF1A1110),
-    surfaceContainerLow = Color(0xFF231C1B),
-    onSurface = Color(0xFFEDE0DE),
-    onSurfaceVariant = Color(0xFFD8C2BE),
-    primary = Color(0xFFFFB4A8),
+    surface = Color(0xFF17181C),
+    surfaceContainerLow = Color(0xFF232529),
+    onSurface = Color(0xFFE6E6E6),
+    onSurfaceVariant = Color(0xFF9E9EA3),
+    primary = Color(0xFF7AA8FF),
 )
 
 /**

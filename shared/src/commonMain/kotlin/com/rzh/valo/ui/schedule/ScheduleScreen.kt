@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -94,8 +95,17 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
                 title = "赛程",
                 largeTitle = state.windowLabel,
                 scrollBehavior = scrollBehavior,
+                actions = {
+                    IconButton(onClick = { showDatePicker = true }) {
+                        Icon(
+                            Icons.Rounded.Event,
+                            contentDescription = "选择日期",
+                            tint = MiuixTheme.colorScheme.primary,
+                        )
+                    }
+                },
                 bottomContent = {
-                    ScheduleFilterRow(state, viewModel, onPickDate = { showDatePicker = true })
+                    ScheduleFilterRow(state, viewModel)
                 },
             )
         },
@@ -195,7 +205,9 @@ private fun DayHeader(day: DayGroup) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            // 吸顶时遮住下方的卡片，必须是不透明底色
+            .background(scheme.surface)
+            .padding(vertical = 6.dp),
     ) {
         Text(
             if (day.isToday) "今天" else com.rzh.valo.data.formatCnDateWithWeekday(day.date),
@@ -227,7 +239,9 @@ private fun TodayFab(
     }
     val visible by remember(state.days, todayIndex) {
         derivedStateOf {
+            // 布局信息未就绪的首帧不显示，避免进页时 FAB 闪现
             todayIndex != null &&
+                listState.layoutInfo.visibleItemsInfo.isNotEmpty() &&
                 listState.layoutInfo.visibleItemsInfo.none { it.key == "day_${state.days[todayIndex].date}" }
         }
     }
@@ -254,12 +268,11 @@ private fun TodayFab(
     }
 }
 
-/** 常驻筛选行：周平移 + 时间窗（点击打开日期选择） + 状态分段 */
+/** 常驻筛选行：周平移 + 时间窗展示（日期选择在顶栏右上角） + 状态分段 */
 @Composable
 private fun ScheduleFilterRow(
     state: ScheduleUiState,
     viewModel: ScheduleViewModel,
-    onPickDate: () -> Unit,
 ) {
     val scheme = MiuixTheme.colorScheme
     Column(Modifier.fillMaxWidth()) {
@@ -267,27 +280,13 @@ private fun ScheduleFilterRow(
             IconButton(onClick = { viewModel.shiftWeek(-1) }, enabled = state.canShiftWeek) {
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "上一周")
             }
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable(onClick = onPickDate)
-                    .padding(vertical = 4.dp),
-            ) {
-                Text(
-                    state.windowLabel,
-                    style = MiuixTheme.textStyles.body1,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.width(6.dp))
-                Icon(
-                    Icons.Rounded.Event,
-                    contentDescription = "选择日期",
-                    tint = scheme.primary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
+            Text(
+                state.windowLabel,
+                style = MiuixTheme.textStyles.body1,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
             IconButton(onClick = { viewModel.shiftWeek(1) }, enabled = state.canShiftWeek) {
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "下一周")
             }
