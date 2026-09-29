@@ -68,35 +68,35 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
-/** 小组件配色：中性深浅底 + miuix 默认蓝强调色（与 shared/ui/theme 一致） */
+/** 小组件配色：与 shared/ui/theme 的自定义深浅色完全一致（浅色卡片 #F2F2F3 / 深色 #1E1E1E） */
 private data class WidgetPaletteColors(
-    val surface: Color,
-    val surfaceContainerLow: Color,
+    val background: Color,
+    val card: Color,
     val onSurface: Color,
-    val onSurfaceVariant: Color,
+    val secondary: Color,
     val primary: Color,
 )
 
 private val WidgetLightColors = WidgetPaletteColors(
-    surface = Color(0xFFF7F8FA),
-    surfaceContainerLow = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF191919),
-    onSurfaceVariant = Color(0xFF757575),
+    background = Color(0xFFF7F7F7),
+    card = Color(0xFFF2F2F3),
+    onSurface = Color(0xFF000000),
+    secondary = Color(0x99000000),
     primary = Color(0xFF3482FF),
 )
 
 private val WidgetDarkColors = WidgetPaletteColors(
-    surface = Color(0xFF17181C),
-    surfaceContainerLow = Color(0xFF232529),
-    onSurface = Color(0xFFE6E6E6),
-    onSurfaceVariant = Color(0xFF9E9EA3),
-    primary = Color(0xFF7AA8FF),
+    background = Color(0xFF141414),
+    card = Color(0xFF1E1E1E),
+    onSurface = Color(0xFFF2F2F2),
+    secondary = Color(0x80FFFFFF),
+    primary = Color(0xFF277AF7),
 )
 
 /**
  * 「近期比赛」桌面小组件：展示进行中/未开赛的比赛，开赛后即使数据源状态
  * 尚未更新也保持展示，直到真正结束才移出；全部结束时回退展示最近完赛的比赛。
- * 每场使用独立信息卡；背景按系统深浅色模式取色，透明度可在应用设置中调节。
+ * 每场使用独立信息卡；背景按系统深浅色模式取色，配色与主程序主题一致。
  * 数据来自磁盘快照，由 [WidgetRefreshWorker] 每小时刷新一次。
  */
 object ScheduleWidget : GlanceAppWidget() {
@@ -169,7 +169,7 @@ object ScheduleWidget : GlanceAppWidget() {
                         style = TextStyle(palette.primary, fontSize = 12.sp, fontWeight = FontWeight.Medium),
                         modifier = GlanceModifier
                             .background(palette.card)
-                            .cornerRadius(14.dp)
+                            .cornerRadius(12.dp)
                             .padding(horizontal = 14.dp, vertical = 8.dp)
                             .clickable(actionRunCallback<WidgetRefreshAction>()),
                     )
@@ -192,7 +192,7 @@ object ScheduleWidget : GlanceAppWidget() {
                 modifier = GlanceModifier
                     .fillMaxWidth()
                     .background(palette.card)
-                    .cornerRadius(18.dp)
+                    .cornerRadius(16.dp)
                     .padding(horizontal = 12.dp, vertical = 10.dp)
                     .clickable(
                         actionStartActivity<MainActivity>(
@@ -338,12 +338,12 @@ object ScheduleWidget : GlanceAppWidget() {
     val MATCH_ID_KEY = ActionParameters.Key<String>(MainActivity.EXTRA_MATCH_ID)
 }
 
-/** 小组件配色（中性深浅底 + 蓝强调色，与主程序主题一致） */
+/** 小组件配色（与主程序主题一致） */
 private class WidgetPalette(colors: WidgetPaletteColors) {
-    val background = ColorProvider(colors.surface)
-    val card = ColorProvider(colors.surfaceContainerLow)
+    val background = ColorProvider(colors.background)
+    val card = ColorProvider(colors.card)
     val onCard = ColorProvider(colors.onSurface)
-    val secondary = ColorProvider(colors.onSurfaceVariant)
+    val secondary = ColorProvider(colors.secondary)
     val primary = ColorProvider(colors.primary)
 }
 

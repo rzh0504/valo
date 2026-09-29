@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#FF4655</color>
-    <color name="widget_preview_background">#F015151A</color>
-    <color name="widget_preview_card">#252329</color>
+    <!-- 小组件 picker 预览底色，与实际深色主题一致（#141414 / #1E1E1E / #F2F2F2） -->
+    <color name="widget_preview_background">#F0141414</color>
+    <color name="widget_preview_card">#1E1E1E</color>
 </resources>

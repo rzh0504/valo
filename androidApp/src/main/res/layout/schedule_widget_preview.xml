@@ -12,7 +12,7 @@
         android:padding="12dp"
         android:background="@color/widget_preview_card"
         android:text="今天 19:00   太平洋联赛 · S2\nWOL              0 : 2              KBG"
-        android:textColor="#F2F2F5"
+        android:textColor="#F2F2F2"
         android:textSize="12sp" />
     <TextView
         android:layout_width="match_parent"
@@ -21,6 +21,6 @@
         android:padding="12dp"
         android:background="@color/widget_preview_card"
         android:text="明天 17:00   全球冠军赛 · BO3\nTE                 VS                 FPX"
-        android:textColor="#F2F2F5"
+        android:textColor="#F2F2F2"
         android:textSize="12sp" />
 </LinearLayout>

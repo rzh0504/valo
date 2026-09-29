@@ -36,6 +36,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            // 与 release 区分包名，允许两版共存（签名各用各的：debug key / 本地 jks）
+            applicationIdSuffix = ".debug"
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -61,7 +65,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.activity:activity-compose:1.13.0")
 
-    // 桌面小组件（Android 专属）：Glance + WorkManager，配色沿用 Material3 色板
+    // 桌面小组件（Android 专属）：Glance + WorkManager，配色与 shared 主题一致
     implementation(platform("androidx.compose:compose-bom:2026.08.00"))
     implementation("androidx.compose.material3:material3:1.5.0-alpha27")
     implementation("androidx.glance:glance-appwidget:1.2.0")
