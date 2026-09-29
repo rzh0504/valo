@@ -10,6 +10,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -82,6 +84,7 @@ import com.rzh.valo.ui.components.StatsTableCell
 import com.rzh.valo.ui.components.StatsTableHeaderRow
 import com.rzh.valo.ui.components.StatusPill
 import com.rzh.valo.ui.components.TeamLogo
+import com.rzh.valo.ui.components.bouncyPress
 import com.rzh.valo.ui.components.tableZebraColor
 import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.basic.Card
@@ -412,15 +415,18 @@ private fun MapsSection(
     }
 }
 
-/** 地图选择药丸（Miaopu 风格）：单行文案，选中淡蓝底蓝字，未选中灰底 */
+/** 地图选择药丸（Miaopu 风格）：单行文案，选中淡蓝底蓝字，未选中灰底；弹性按压替代矩形水波纹 */
 @Composable
 private fun MapPill(label: String, selected: Boolean, onClick: () -> Unit) {
     val scheme = MiuixTheme.colorScheme
+    val interaction = remember { MutableInteractionSource() }
     Surface(
         shape = RoundedCornerShape(50),
         color = if (selected) scheme.primary.copy(alpha = 0.12f) else scheme.surfaceContainerHighest,
         contentColor = if (selected) scheme.primary else scheme.onSurface,
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier
+            .bouncyPress(interaction)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
     ) {
         Text(
             label,
@@ -981,15 +987,18 @@ private fun ScoreBlock(item: MatchItem, modifier: Modifier = Modifier) {
     }
 }
 
-/** 低调的外部链接胶囊（打开系统浏览器） */
+/** 低调的外部链接胶囊（打开系统浏览器）；弹性按压替代矩形水波纹 */
 @Composable
 private fun LinkPill(link: LinkInfo) {
     val scheme = MiuixTheme.colorScheme
     val urlOpener = rememberLocalUrlOpener()
+    val interaction = remember { MutableInteractionSource() }
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = scheme.surfaceContainer,
-        modifier = Modifier.clickable { urlOpener(link.url) },
+        modifier = Modifier
+            .bouncyPress(interaction)
+            .clickable(interactionSource = interaction, indication = null) { urlOpener(link.url) },
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
