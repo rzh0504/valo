@@ -143,8 +143,9 @@ class TournamentViewModel(
             matches.filter { it.stage?.id == s.selectedStageId }
         }
         val today = todayCn()
+        // 赛程按时间正序（从先到后）展示
         val groups = filtered
-            .sortedByDescending { it.startTime }
+            .sortedBy { it.startTime }
             .groupBy { epochToLocalDate(it.startTime) }
             .map { (date, ms) -> TeamMatchGroup(date, date == today, ms) }
 

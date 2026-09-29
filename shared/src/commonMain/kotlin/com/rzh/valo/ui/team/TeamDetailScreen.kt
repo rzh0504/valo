@@ -2,7 +2,6 @@ package com.rzh.valo.ui.team
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,15 +21,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.data.PlayerStatsRow
@@ -45,8 +42,14 @@ import com.rzh.valo.data.percentText
 import com.rzh.valo.ui.LocalAppContainer
 import com.rzh.valo.ui.Route
 import com.rzh.valo.ui.components.LoadingPane
+import com.rzh.valo.ui.components.StatsTableCard
+import com.rzh.valo.ui.components.StatsTableCell
+import com.rzh.valo.ui.components.StatsTableHeaderRow
 import com.rzh.valo.ui.components.TeamLogo
+import com.rzh.valo.ui.components.tableZebraColor
 import kotlin.math.roundToInt
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
@@ -54,10 +57,9 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
@@ -77,7 +79,7 @@ fun TeamDetailScreen(
     val scrollBehavior = MiuixScrollBehavior()
     Scaffold(
         topBar = {
-            TopAppBar(
+            SmallTopAppBar(
                 title = state.base?.displayName?.ifBlank { route.name }?.ifBlank { "战队详情" } ?: route.name.ifBlank { "战队详情" },
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
@@ -116,6 +118,20 @@ fun TeamDetailScreen(
                 ) {
                     Spacer(Modifier.height(4.dp))
                     TeamHeaderCard(state.base, route)
+                    Spacer(Modifier.height(12.dp))
+                    // 显眼的全部赛程入口（原页面底部的箭头条目已移除）
+                    Button(
+                        onClick = onOpenSchedule,
+                        colors = ButtonDefaults.buttonColorsPrimary(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            "全部赛程",
+                            style = MiuixTheme.textStyles.body1,
+                            fontWeight = FontWeight.Medium,
+                            color = MiuixTheme.colorScheme.onPrimary,
+                        )
+                    }
                     state.record?.let { record ->
                         state.stats?.let { stats ->
                             Spacer(Modifier.height(12.dp))
@@ -134,9 +150,9 @@ fun TeamDetailScreen(
                         TeamRewardCard(state.rewards)
                     }
                     state.roster?.let { roster ->
-                        if (roster.active.isNotEmpty() || roster.organization.isNotEmpty()) {
+                        if (roster.active.isNotEmpty()) {
                             Spacer(Modifier.height(12.dp))
-                            TeamRosterCard(roster.active, roster.organization)
+                            TeamRosterCard(roster.active)
                         }
                     }
                     val activePlayers = state.playerStats
@@ -146,13 +162,6 @@ fun TeamDetailScreen(
                         Spacer(Modifier.height(12.dp))
                         PlayerStatsCard(activePlayers)
                     }
-                    Spacer(Modifier.height(12.dp))
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        ArrowPreference(
-                            title = "查看完整赛程",
-                            onClick = onOpenSchedule,
-                        )
-                    }
                     Spacer(Modifier.height(24.dp))
                 }
             }
@@ -160,6 +169,7 @@ fun TeamDetailScreen(
     }
 }
 
+/** 头部：徽标居中，下方一行赛区 · 地点 · 成立时间（不展示简介文本） */
 @Composable
 private fun TeamHeaderCard(base: TeamBase?, route: Route.TeamInfo) {
     val scheme = MiuixTheme.colorScheme
@@ -167,52 +177,25 @@ private fun TeamHeaderCard(base: TeamBase?, route: Route.TeamInfo) {
         cornerRadius = 16.dp,
         colors = CardDefaults.defaultColors(color = scheme.surfaceContainer),
     ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TeamLogo(base?.icon ?: route.icon.takeIf { it.isNotBlank() }, size = 64, shape = CircleShape)
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        base?.displayName?.ifBlank { route.name } ?: route.name,
-                        style = MiuixTheme.textStyles.title3,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    val meta = listOfNotNull(
-                        base?.nameShort?.takeIf { it.isNotBlank() } ?: route.short.takeIf { it.isNotBlank() },
-                        base?.zoneName,
-                    )
-                    if (meta.isNotEmpty()) {
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            meta.joinToString(" · "),
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = scheme.onSurfaceVariantSummary,
-                        )
-                    }
-                    listOfNotNull(
-                        base?.city?.takeIf { it.isNotBlank() },
-                        base?.establishDate?.takeIf { it.isNotBlank() },
-                    ).takeIf { it.isNotEmpty() }?.let {
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            it.joinToString(" · "),
-                            style = MiuixTheme.textStyles.footnote2,
-                            color = scheme.onSurfaceVariantSummary,
-                        )
-                    }
-                }
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            TeamLogo(base?.icon ?: route.icon.takeIf { it.isNotBlank() }, size = 72, shape = CircleShape)
+            val meta = listOfNotNull(
+                base?.zoneName,
+                base?.city,
+                base?.establishDate,
+            ).filterNotNull().filter { it.isNotBlank() }
+            if (meta.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    meta.joinToString(" · "),
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = scheme.onSurfaceVariantSummary,
+                    textAlign = TextAlign.Center,
+                )
             }
-            val describe = base?.describe?.takeIf { it.isNotBlank() } ?: return@Column
-            Spacer(Modifier.height(12.dp))
-            var expanded by remember { mutableStateOf(false) }
-            Text(
-                describe,
-                style = MiuixTheme.textStyles.body2,
-                color = scheme.onSurfaceVariantSummary,
-                maxLines = if (expanded) Int.MAX_VALUE else 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clickable { expanded = !expanded },
-            )
         }
     }
 }
@@ -257,52 +240,61 @@ private fun TeamStatsCard(stats: TeamStats, record: TeamRecord) {
 @Composable
 private fun TeamMapCard(maps: List<TeamMapStats>) {
     val scheme = MiuixTheme.colorScheme
-    SectionCard(title = "地图胜率") {
+    StatsTableCard(title = "地图胜率") {
+        StatsTableHeaderRow("地图", listOf("场次" to 56.dp, "胜率" to 56.dp))
         maps.forEachIndexed { index, map ->
-            if (index > 0) Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TeamLogo(map.icon, size = 22)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    map.displayName,
-                    style = MiuixTheme.textStyles.body2,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    "${map.games}局",
-                    style = MiuixTheme.textStyles.body2,
-                    color = scheme.onSurfaceVariantSummary,
-                )
-                Spacer(Modifier.width(12.dp))
-                val rate = if (map.games > 0) map.wins * 100.0 / map.games else 0.0
-                Text(
-                    "${rate.roundToInt()}%",
-                    style = MiuixTheme.textStyles.body2,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (rate >= 50) scheme.primary else scheme.onSurface,
-                )
+            val rate = if (map.games > 0) map.wins * 100.0 / map.games else 0.0
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(36.dp)
+                    .background(tableZebraColor(index, scheme)),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f).padding(start = 12.dp),
+                ) {
+                    TeamLogo(map.icon, size = 20)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        map.displayName,
+                        style = MiuixTheme.textStyles.body2,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                StatsTableCell("${map.games}局", 56.dp, secondary = true)
+                StatsTableCell("${rate.roundToInt()}%", 56.dp, emphasized = rate >= 50)
             }
         }
     }
 }
 
-/** 赛事名次与奖金（最近 5 条） */
+/** 赛事名次与奖金（最近 5 条）：名次 + 赛事/日期在左，战绩与奖金为对齐列 */
 @Composable
 private fun TeamRewardCard(rewards: List<TeamReward>) {
     val scheme = MiuixTheme.colorScheme
-    SectionCard(title = "赛事名次") {
+    StatsTableCard(title = "赛事名次") {
+        StatsTableHeaderRow("赛事", listOf("战绩" to 68.dp, "奖金" to 68.dp))
         rewards.take(5).forEachIndexed { index, reward ->
-            if (index > 0) Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(tableZebraColor(index, scheme))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
                 Text(
                     reward.rank.orEmpty(),
-                    style = MiuixTheme.textStyles.body2,
+                    style = MiuixTheme.textStyles.footnote1,
                     fontWeight = FontWeight.SemiBold,
                     color = scheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.width(64.dp),
                 )
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
                         reward.group?.nameMain.orEmpty(),
@@ -311,42 +303,29 @@ private fun TeamRewardCard(rewards: List<TeamReward>) {
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        "${reward.matchWinCount}胜${reward.matchCount - reward.matchWinCount}负 · ${reward.date.orEmpty()}",
+                        reward.date.orEmpty(),
                         style = MiuixTheme.textStyles.footnote2,
                         color = scheme.onSurfaceVariantSummary,
                     )
                 }
-                Text(
-                    reward.bonus.orEmpty(),
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = scheme.onSurfaceVariantSummary,
+                StatsTableCell(
+                    "${reward.matchWinCount}胜${reward.matchCount - reward.matchWinCount}负",
+                    68.dp,
+                    secondary = true,
                 )
+                StatsTableCell(reward.bonus.orEmpty().ifBlank { "—" }, 68.dp, secondary = true)
             }
         }
     }
 }
 
-/** 选手名单：现役在前（替补/不活跃带标注），教练组以小节附后 */
+/** 选手名单：现役（替补/不活跃带标注） */
 @Composable
-private fun TeamRosterCard(active: List<RosterMember>, organization: List<RosterMember>) {
-    val scheme = MiuixTheme.colorScheme
+private fun TeamRosterCard(active: List<RosterMember>) {
     SectionCard(title = "选手名单") {
         active.forEachIndexed { index, member ->
             if (index > 0) Spacer(Modifier.height(10.dp))
             RosterRow(member)
-        }
-        if (organization.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            Text(
-                "教练组",
-                style = MiuixTheme.textStyles.footnote2,
-                color = scheme.onSurfaceVariantSummary,
-            )
-            Spacer(Modifier.height(10.dp))
-            organization.forEachIndexed { index, member ->
-                if (index > 0) Spacer(Modifier.height(10.dp))
-                RosterRow(member)
-            }
         }
     }
 }
@@ -406,72 +385,46 @@ private fun RosterRow(member: RosterMember) {
     }
 }
 
-/** 选手数据（现役，按 ACS 降序）；列与详情页选手对位表同款宽度节奏 */
+/** 选手数据（现役，按 ACS 降序；表头带 + 斑马行） */
 @Composable
 private fun PlayerStatsCard(players: List<PlayerStatsRow>) {
     val scheme = MiuixTheme.colorScheme
-    SectionCard(title = "选手数据") {
-        Row(Modifier.fillMaxWidth()) {
-            Text(
-                "选手",
-                style = MiuixTheme.textStyles.footnote2,
-                color = scheme.onSurfaceVariantSummary,
-                modifier = Modifier.weight(1f),
-            )
-            StatsHeaderCell("ACS")
-            StatsHeaderCell("KD")
-            StatsHeaderCell("ADR")
-            StatsHeaderCell("KAST")
-        }
-        Spacer(Modifier.height(8.dp))
+    StatsTableCard(title = "选手数据") {
+        StatsTableHeaderRow(
+            "选手",
+            listOf("ACS" to 52.dp, "KD" to 52.dp, "ADR" to 52.dp, "KAST" to 52.dp),
+        )
         players.forEachIndexed { index, player ->
-            if (index > 0) Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            player.career?.idName.orEmpty(),
-                            style = MiuixTheme.textStyles.body2,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        player.heroes.take(3).forEach { hero ->
-                            TeamLogo(hero.icon, size = 16)
-                            Spacer(Modifier.width(2.dp))
-                        }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(36.dp)
+                    .background(tableZebraColor(index, scheme)),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f).padding(start = 12.dp),
+                ) {
+                    Text(
+                        player.career?.idName.orEmpty(),
+                        style = MiuixTheme.textStyles.body2,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    player.heroes.take(3).forEach { hero ->
+                        TeamLogo(hero.icon, size = 16)
+                        Spacer(Modifier.width(2.dp))
                     }
                 }
-                StatsValueCell(player.acs.formatFixed(0), emphasized = index == 0)
-                StatsValueCell(player.kd.formatFixed(2))
-                StatsValueCell(player.adr.formatFixed(0))
-                StatsValueCell("${player.kast.roundToInt()}%")
+                StatsTableCell(player.acs.formatFixed(0), 52.dp)
+                StatsTableCell(player.kd.formatFixed(2), 52.dp)
+                StatsTableCell(player.adr.formatFixed(0), 52.dp)
+                StatsTableCell("${player.kast.roundToInt()}%", 52.dp)
             }
         }
     }
-}
-
-@Composable
-private fun StatsHeaderCell(label: String) {
-    Text(
-        label,
-        style = MiuixTheme.textStyles.footnote2,
-        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-        textAlign = TextAlign.End,
-        modifier = Modifier.width(46.dp),
-    )
-}
-
-@Composable
-private fun StatsValueCell(value: String, emphasized: Boolean = false) {
-    Text(
-        value,
-        style = MiuixTheme.textStyles.body2,
-        fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal,
-        textAlign = TextAlign.End,
-        modifier = Modifier.width(46.dp),
-    )
 }
 
 @Composable

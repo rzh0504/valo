@@ -77,8 +77,12 @@ import com.rzh.valo.data.formatFixed
 import com.rzh.valo.data.formatFullTime
 import com.rzh.valo.data.epochToLocalDate
 import com.rzh.valo.ui.LocalAppContainer
+import com.rzh.valo.ui.components.StatsTableCard
+import com.rzh.valo.ui.components.StatsTableCell
+import com.rzh.valo.ui.components.StatsTableHeaderRow
 import com.rzh.valo.ui.components.StatusPill
 import com.rzh.valo.ui.components.TeamLogo
+import com.rzh.valo.ui.components.tableZebraColor
 import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -1027,33 +1031,37 @@ private fun ForesightSection(foresight: ForesightUiState, main: Participant, gue
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.height(10.dp))
-        Card(
-            cornerRadius = 16.dp,
-            colors = CardDefaults.defaultColors(color = scheme.surfaceContainer),
-        ) {
-            when {
-                foresight.loading -> Box(
+        when {
+            foresight.loading -> Card(
+                cornerRadius = 16.dp,
+                colors = CardDefaults.defaultColors(color = scheme.surfaceContainer),
+            ) {
+                Box(
                     Modifier.fillMaxWidth().padding(vertical = 28.dp),
                     contentAlignment = Alignment.Center,
                 ) { InfiniteProgressIndicator() }
+            }
 
-                foresight.failed -> Text(
+            foresight.failed -> Card(
+                cornerRadius = 16.dp,
+                colors = CardDefaults.defaultColors(color = scheme.surfaceContainer),
+            ) {
+                Text(
                     "前瞻数据加载失败",
                     style = MiuixTheme.textStyles.body2,
                     color = scheme.onSurfaceVariantSummary,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),
                 )
+            }
 
-                else -> Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                    foresight.fight?.let { fight ->
-                        Text(
-                            "历史交手",
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = scheme.onSurfaceVariantSummary,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+            else -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                foresight.fight?.let { fight ->
+                    StatsTableCard(title = "历史交手") {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                        ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.End,
@@ -1092,47 +1100,26 @@ private fun ForesightSection(foresight: ForesightUiState, main: Participant, gue
                                 )
                             }
                         }
-                        if (fight.matchList.isNotEmpty()) {
-                            Spacer(Modifier.height(4.dp))
-                            fight.matchList.forEach { match -> TeamRecentRow(main, match) }
+                        StatsTableHeaderRow(
+                            "对手",
+                            listOf("日期" to 56.dp, "比分" to 64.dp, "结果" to 52.dp),
+                        )
+                        fight.matchList.forEachIndexed { index, match ->
+                            TeamRecentRow(index, main, match)
                         }
                     }
+                }
 
-                    val maps = foresight.maps
-                    if (maps.isNotEmpty()) {
-                        if (foresight.fight != null) {
-                            Spacer(Modifier.height(14.dp))
-                            HorizontalDivider()
-                            Spacer(Modifier.height(10.dp))
+                val maps = foresight.maps
+                if (maps.isNotEmpty()) {
+                    StatsTableCard(title = "地图胜率") {
+                        StatsTableHeaderRow(
+                            "地图",
+                            listOf(main.displayName to 72.dp, guest.displayName to 72.dp),
+                        )
+                        maps.forEachIndexed { index, map ->
+                            MapRecordRow(index, map)
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "地图胜率",
-                                style = MiuixTheme.textStyles.footnote1,
-                                color = scheme.onSurfaceVariantSummary,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                main.displayName,
-                                style = MiuixTheme.textStyles.footnote2,
-                                color = scheme.onSurfaceVariantSummary,
-                                textAlign = TextAlign.End,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.width(72.dp),
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text(
-                                guest.displayName,
-                                style = MiuixTheme.textStyles.footnote2,
-                                color = scheme.onSurfaceVariantSummary,
-                                textAlign = TextAlign.End,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.width(72.dp),
-                            )
-                        }
-                        maps.forEach { map -> MapRecordRow(map) }
                     }
                 }
             }
@@ -1140,57 +1127,68 @@ private fun ForesightSection(foresight: ForesightUiState, main: Participant, gue
     }
 }
 
-/** 单张地图的双方历史胜率行，占优一侧高亮 */
+/** 单张地图的双方历史胜率行（斑马行），占优一侧高亮 */
 @Composable
-private fun MapRecordRow(map: MapRecord) {
+private fun MapRecordRow(index: Int, map: MapRecord) {
     val scheme = MiuixTheme.colorScheme
     val mainBetter = map.mainWins * map.guestMatches > map.guestWins * map.mainMatches
     val guestBetter = map.guestWins * map.mainMatches > map.mainWins * map.guestMatches
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .background(tableZebraColor(index, scheme))
+            .padding(start = 12.dp),
     ) {
         TeamLogo(map.icon, size = 22)
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
-            Text(map.displayName, style = MiuixTheme.textStyles.body2)
+            Text(
+                map.displayName,
+                style = MiuixTheme.textStyles.body2,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             if (!map.nameEn.isNullOrBlank() && map.nameEn != map.displayName) {
                 Text(
                     map.nameEn,
                     style = MiuixTheme.textStyles.footnote2,
                     color = scheme.onSurfaceVariantSummary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
         MapRateCell(map.mainWins, map.mainMatches, mainBetter)
-        Spacer(Modifier.width(12.dp))
         MapRateCell(map.guestWins, map.guestMatches, guestBetter)
     }
 }
 
-/** 单侧胜率单元格：有场次显示百分比，无数据显示占位符 */
+/** 单侧胜率单元格：有场次显示百分比（占优高亮），无数据显示占位符 */
 @Composable
 private fun MapRateCell(wins: Int, matches: Int, highlight: Boolean) {
     val scheme = MiuixTheme.colorScheme
-    Text(
-        if (matches > 0) "${(wins * 100.0 / matches).roundToInt()}%" else "—",
-        style = MiuixTheme.textStyles.body2,
-        fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Normal,
-        color = when {
-            highlight -> scheme.primary
-            matches == 0 -> scheme.onSurfaceVariantSummary
-            else -> scheme.onSurface
-        },
-        textAlign = TextAlign.End,
-        maxLines = 1,
-        modifier = Modifier.width(72.dp),
-    )
+    Box(Modifier.width(72.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+        Text(
+            if (matches > 0) "${(wins * 100.0 / matches).roundToInt()}%" else "—",
+            style = MiuixTheme.textStyles.body2,
+            fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Normal,
+            color = when {
+                highlight -> scheme.primary
+                matches == 0 -> scheme.onSurfaceVariantSummary
+                else -> scheme.onSurface
+            },
+            maxLines = 1,
+        )
+    }
 }
 
 // ---------- H2H 交手列表行 ----------
 
+/** 历史交手表行（以 [team] 视角，斑马行）：对手 | 日期 | 比分 | 结果 */
 @Composable
-private fun TeamRecentRow(team: Participant, match: MatchItem) {
+private fun TeamRecentRow(index: Int, team: Participant, match: MatchItem) {
     val scheme = MiuixTheme.colorScheme
     val versus = match.versus ?: return
     val side = teamSide(versus, team)
@@ -1202,14 +1200,12 @@ private fun TeamRecentRow(team: Participant, match: MatchItem) {
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .background(tableZebraColor(index, scheme))
+            .padding(start = 12.dp),
     ) {
-        Text(
-            formatCnDate(epochToLocalDate(match.startTime)),
-            style = MiuixTheme.textStyles.footnote1,
-            color = scheme.onSurfaceVariantSummary,
-            modifier = Modifier.width(52.dp),
-        )
         TeamLogo(opponent?.icon, size = 22)
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
@@ -1227,14 +1223,11 @@ private fun TeamRecentRow(team: Participant, match: MatchItem) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Text(
-            "${teamScore ?: "0"} : ${oppScore ?: "0"}",
-            style = MiuixTheme.textStyles.body2,
-            fontWeight = FontWeight.SemiBold,
-            color = if (won) scheme.primary else scheme.onSurfaceVariantSummary,
-        )
-        Spacer(Modifier.width(10.dp))
-        if (match.isFinished) ResultPill(won) else StatusPill(match.status)
+        StatsTableCell(formatCnDate(epochToLocalDate(match.startTime)), 56.dp, secondary = true)
+        StatsTableCell("${teamScore ?: "0"} : ${oppScore ?: "0"}", 64.dp, emphasized = won, secondary = !won)
+        Box(Modifier.width(52.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+            if (match.isFinished) ResultPill(won) else StatusPill(match.status)
+        }
     }
 }
 
