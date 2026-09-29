@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,7 +46,6 @@ import com.rzh.valo.ui.LocalAppContainer
 import com.rzh.valo.ui.Route
 import com.rzh.valo.ui.components.LoadingPane
 import com.rzh.valo.ui.components.TeamLogo
-import com.rzh.valo.ui.components.TonalActionSurface
 import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -59,6 +57,7 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
@@ -148,24 +147,11 @@ fun TeamDetailScreen(
                         PlayerStatsCard(activePlayers)
                     }
                     Spacer(Modifier.height(12.dp))
-                    TonalActionSurface(onClick = onOpenSchedule, modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                        ) {
-                            Text(
-                                "查看完整赛程",
-                                style = MiuixTheme.textStyles.footnote1,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            Spacer(Modifier.weight(1f))
-                            Icon(
-                                Icons.AutoMirrored.Rounded.ArrowForward,
-                                contentDescription = null,
-                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        ArrowPreference(
+                            title = "查看完整赛程",
+                            onClick = onOpenSchedule,
+                        )
                     }
                     Spacer(Modifier.height(24.dp))
                 }

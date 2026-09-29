@@ -358,18 +358,3 @@ private fun ScoreText(score: String, isWinner: Boolean) {
         color = if (isWinner) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
     )
 }
-
-/** 可点击的表面容器（按压回弹） */
-@Composable
-fun TonalActionSurface(onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = MiuixTheme.colorScheme.surfaceContainer,
-        modifier = modifier
-            .bouncyPress(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
-    ) {
-        content()
-    }
-}

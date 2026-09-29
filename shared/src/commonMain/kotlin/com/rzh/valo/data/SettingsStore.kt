@@ -35,16 +35,12 @@ fun List<MatchItem>.filterByLevels(enabled: Set<String>): List<MatchItem> = filt
 class SettingsStore(private val dataStore: DataStore<Preferences>) {
 
     private val themeKey = intPreferencesKey("theme_mode")
-    private val dynamicKey = booleanPreferencesKey("dynamic_color")
     private val widgetOpacityKey = floatPreferencesKey("widget_opacity")
     private val matchLevelsKey = stringSetPreferencesKey("match_levels")
 
     val themeMode: Flow<ThemeMode> = dataStore.data.map {
         ThemeMode.from(it[themeKey] ?: ThemeMode.SYSTEM.id)
     }
-
-    /** 动态取色（Android 12+ 为壁纸取色；其他平台回退主题色种子） */
-    val dynamicColor: Flow<Boolean> = dataStore.data.map { it[dynamicKey] ?: true }
 
     /** 桌面小组件背景不透明度（0.2 ~ 1.0） */
     val widgetOpacity: Flow<Float> = dataStore.data.map { it[widgetOpacityKey] ?: 1f }
@@ -56,10 +52,6 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setThemeMode(mode: ThemeMode) {
         dataStore.edit { it[themeKey] = mode.id }
-    }
-
-    suspend fun setDynamicColor(enabled: Boolean) {
-        dataStore.edit { it[dynamicKey] = enabled }
     }
 
     suspend fun setWidgetOpacity(value: Float) {

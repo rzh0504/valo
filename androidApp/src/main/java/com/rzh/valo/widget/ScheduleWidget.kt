@@ -4,9 +4,6 @@ import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import androidx.core.graphics.drawable.toBitmap
-import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
@@ -71,24 +68,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
-/** 品牌色（与 shared/ui/theme 保持一致的 VALORANT 红派生），供小组件在动态取色不可用时使用 */
-private object WidgetBrandColors {
-    val light = WidgetPaletteColors(
-        surface = Color(0xFFFFF8F6),
-        surfaceContainerLow = Color(0xFFF7F0EE),
-        onSurface = Color(0xFF201A19),
-        onSurfaceVariant = Color(0xFF534341),
-        primary = Color(0xFFA3382F),
-    )
-    val dark = WidgetPaletteColors(
-        surface = Color(0xFF1A1110),
-        surfaceContainerLow = Color(0xFF231C1B),
-        onSurface = Color(0xFFEDE0DE),
-        onSurfaceVariant = Color(0xFFD8C2BE),
-        primary = Color(0xFFFFB4A8),
-    )
-}
-
+/** 品牌色（与 shared/ui/theme 保持一致的 VALORANT 红派生），小组件固定使用 */
 private data class WidgetPaletteColors(
     val surface: Color,
     val surfaceContainerLow: Color,
@@ -97,20 +77,21 @@ private data class WidgetPaletteColors(
     val primary: Color,
 )
 
-private fun widgetColorScheme(context: Context, dark: Boolean, dynamic: Boolean): WidgetPaletteColors {
-    if (dynamic && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-        val scheme: ColorScheme =
-            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        return WidgetPaletteColors(
-            surface = scheme.surface,
-            surfaceContainerLow = scheme.surfaceContainerLow,
-            onSurface = scheme.onSurface,
-            onSurfaceVariant = scheme.onSurfaceVariant,
-            primary = scheme.primary,
-        )
-    }
-    return if (dark) WidgetBrandColors.dark else WidgetBrandColors.light
-}
+private val WidgetLightColors = WidgetPaletteColors(
+    surface = Color(0xFFFFF8F6),
+    surfaceContainerLow = Color(0xFFF7F0EE),
+    onSurface = Color(0xFF201A19),
+    onSurfaceVariant = Color(0xFF534341),
+    primary = Color(0xFFA3382F),
+)
+
+private val WidgetDarkColors = WidgetPaletteColors(
+    surface = Color(0xFF1A1110),
+    surfaceContainerLow = Color(0xFF231C1B),
+    onSurface = Color(0xFFEDE0DE),
+    onSurfaceVariant = Color(0xFFD8C2BE),
+    primary = Color(0xFFFFB4A8),
+)
 
 /**
  * 「近期比赛」桌面小组件：展示进行中/未开赛的比赛，开赛后即使数据源状态
@@ -134,7 +115,6 @@ object ScheduleWidget : GlanceAppWidget() {
                 opacity = container.settingsStore.widgetOpacity.first(),
                 matchLevels = container.settingsStore.matchLevels.first(),
                 themeMode = container.settingsStore.themeMode.first(),
-                dynamicColor = container.settingsStore.dynamicColor.first(),
             )
         }
         val darkTheme = when (data.themeMode) {
@@ -143,7 +123,10 @@ object ScheduleWidget : GlanceAppWidget() {
             ThemeMode.LIGHT -> false
             ThemeMode.DARK -> true
         }
-        val palette = WidgetPalette(widgetColorScheme(context, darkTheme, data.dynamicColor), data.opacity)
+        val palette = WidgetPalette(
+            if (darkTheme) WidgetDarkColors else WidgetLightColors,
+            data.opacity,
+        )
         // 队标并发加载，Coil 磁盘缓存命中时不发网络
         val rows = coroutineScope {
             widgetRows(data.items, data.matchLevels).map { row ->
@@ -168,7 +151,6 @@ object ScheduleWidget : GlanceAppWidget() {
         val opacity: Float,
         val matchLevels: Set<String>,
         val themeMode: ThemeMode,
-        val dynamicColor: Boolean,
     )
 
     @Composable

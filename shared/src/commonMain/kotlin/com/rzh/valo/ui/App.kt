@@ -64,10 +64,9 @@ fun App(
     onWidgetDataChanged: (suspend () -> Unit)? = null,
 ) {
     val themeMode by container.settingsStore.themeMode.collectAsStateWithLifecycle(ThemeMode.SYSTEM)
-    val dynamicColor by container.settingsStore.dynamicColor.collectAsStateWithLifecycle(true)
     val fallbackOwner = remember { AppViewModelStoreOwner() }
 
-    ValoTheme(themeMode = themeMode, dynamicColor = dynamicColor) {
+    ValoTheme(themeMode = themeMode) {
         CompositionLocalProvider(
             LocalAppContainer provides container,
             LocalVersionName provides versionName,

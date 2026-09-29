@@ -20,9 +20,6 @@ class SettingsViewModel(
     val themeMode: StateFlow<ThemeMode> =
         container.settingsStore.themeMode.stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.SYSTEM)
 
-    val dynamicColor: StateFlow<Boolean> =
-        container.settingsStore.dynamicColor.stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
     val widgetOpacity: StateFlow<Float> =
         container.settingsStore.widgetOpacity.stateIn(viewModelScope, SharingStarted.Eagerly, 1f)
 
@@ -32,13 +29,6 @@ class SettingsViewModel(
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
             container.settingsStore.setThemeMode(mode)
-            onWidgetDataChanged?.invoke()
-        }
-    }
-
-    fun setDynamicColor(enabled: Boolean) {
-        viewModelScope.launch {
-            container.settingsStore.setDynamicColor(enabled)
             onWidgetDataChanged?.invoke()
         }
     }
