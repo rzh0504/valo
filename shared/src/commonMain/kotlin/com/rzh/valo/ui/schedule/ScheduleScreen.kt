@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -56,6 +57,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TopAppBar
@@ -90,10 +92,11 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
 
     val scrollBehavior = MiuixScrollBehavior()
     Scaffold(
+        // 底部安全区由外层 MainTabs 的 bottomBar 统一处理，内层不再叠加
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            TopAppBar(
+            SmallTopAppBar(
                 title = "赛程",
-                largeTitle = state.windowLabel,
                 scrollBehavior = scrollBehavior,
                 actions = {
                     IconButton(onClick = { showDatePicker = true }) {
@@ -268,7 +271,7 @@ private fun TodayFab(
     }
 }
 
-/** 常驻筛选行：周平移 + 时间窗展示（日期选择在顶栏右上角） + 状态分段 */
+/** 常驻顶栏下沿：周平移 + 时间窗展示（日期选择在顶栏右上角） */
 @Composable
 private fun ScheduleFilterRow(
     state: ScheduleUiState,
@@ -303,16 +306,6 @@ private fun ScheduleFilterRow(
                 textAlign = TextAlign.Center,
             )
         }
-        FilterSegments(
-            options = listOf(
-                ScheduleFilter.ALL to "全部",
-                ScheduleFilter.SCHEDULED to "未开始",
-                ScheduleFilter.FINISHED to "已结束",
-            ),
-            selected = state.filter,
-            onSelect = { viewModel.setFilter(it) },
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
-        )
     }
 }
 
