@@ -46,6 +46,8 @@ jobs:
             CODE_SIGN_IDENTITY= \
             build
 
+      # 只构建 arm64：工程未注册 iosX64，Compose 的资源同步任务遇到 x86_64 会
+      # 报 "Unknown iOS simulator arch"；Appetize 官方也推荐 ARM 模拟器构建
       - name: 构建 iOS 模拟器版（Appetize 等云模拟器用）
         run: |
           xcodebuild \
@@ -53,6 +55,7 @@ jobs:
             -target iosApp \
             -configuration Release \
             -sdk iphonesimulator \
+            ARCHS=arm64 \
             SYMROOT="$PWD/build/ios-sim" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY= \
