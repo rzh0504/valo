@@ -3,11 +3,15 @@ package com.rzh.valo.ui
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,6 +19,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -25,13 +30,24 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Today
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationBar
+import top.yukonga.miuix.kmp.basic.NavigationBarDefaults
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -48,7 +64,7 @@ private val TABS = listOf(
     TabSpec("设置", Icons.Outlined.Settings, Icons.Rounded.Settings),
 )
 
-/** 悬浮毛玻璃底栏的几何：上边距 + 胶囊高度 + 下边距（避让手势条，至少 8dp） */
+/** 悬浮毛玻璃底栏的几何：胶囊高度 + 上下边距（避让手势条，至少 8dp） */
 private const val PILL_HEIGHT_DP = 64
 private const val PILL_MARGIN_DP = 8
 
@@ -82,8 +98,11 @@ internal fun MainNavigationBar(
         return
     }
 
+    val scheme = MiuixTheme.colorScheme
     val shape = RoundedCornerShape(50)
-    val tint = MiuixTheme.colorScheme.surfaceContainer
+    // 页面背景与卡片同色系，胶囊底提亮一档（深色用卡片色、浅色用纯白）再压一层投影，保证边界可辨
+    val isDark = scheme.background.luminance() < 0.5f
+    val tint = if (isDark) scheme.surfaceContainer.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.75f)
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Box(
         Modifier
@@ -95,8 +114,12 @@ internal fun MainNavigationBar(
             Modifier
                 .fillMaxWidth()
                 .height(PILL_HEIGHT_DP.dp)
+                .dropShadow(
+                    shape = shape,
+                    shadow = Shadow(radius = 12.dp, color = Color.Black, alpha = if (isDark) 0.25f else 0.1f),
+                )
                 .textureBlur(backdrop = backdrop, shape = shape, blurRadius = 24f)
-                .background(tint.copy(alpha = 0.55f), shape),
+                .background(tint, shape),
         ) {
             // 选中药丸：仅悬浮底栏有，随选中页签弹簧滑动到目标格
             BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -111,17 +134,47 @@ internal fun MainNavigationBar(
                     Modifier
                         .offset(x = indicatorX, y = 8.dp)
                         .size(width = indicatorWidth, height = PILL_HEIGHT_DP.dp - 16.dp)
-                        .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.15f), shape),
+                        .background(scheme.primary.copy(alpha = 0.15f), shape),
                 )
             }
-            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+            // 条目自绘而非 NavigationBarItem：后者内容顶部对齐按整条 64dp 排布，
+            // 在胶囊里会偏上；这里居中排布让图标+文字落在选中药丸正中
+            Row(Modifier.fillMaxSize()) {
                 TABS.forEachIndexed { index, tab ->
-                    NavigationBarItem(
-                        selected = currentIndex == index,
-                        onClick = { onSelect(index) },
-                        icon = if (currentIndex == index) tab.selectedIcon else tab.icon,
-                        label = tab.label,
-                    )
+                    val selected = currentIndex == index
+                    val interaction = remember { MutableInteractionSource() }
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .selectable(
+                                selected = selected,
+                                onClick = { onSelect(index) },
+                                interactionSource = interaction,
+                                indication = null,
+                                role = Role.Tab,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (selected) tab.selectedIcon else tab.icon,
+                                contentDescription = tab.label,
+                                tint = scheme.onSurfaceContainer,
+                                modifier = Modifier.size(NavigationBarDefaults.IconSize),
+                            )
+                            Text(
+                                tab.label,
+                                color = scheme.onSurfaceContainer,
+                                fontSize = NavigationBarDefaults.LabelFontSize,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1,
+                            )
+                        }
+                    }
                 }
             }
         }
