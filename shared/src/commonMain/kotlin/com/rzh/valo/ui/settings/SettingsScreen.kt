@@ -15,7 +15,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.data.MATCH_LEVELS
 import com.rzh.valo.data.ThemeMode
 import com.rzh.valo.ui.LocalAppContainer
-import com.rzh.valo.ui.LocalBottomBarInset
 import com.rzh.valo.ui.LocalVersionName
 import com.rzh.valo.ui.LocalWidgetRefresher
 import top.yukonga.miuix.kmp.basic.Card
@@ -25,7 +24,6 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
-import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
 /** 主题模式下拉选项（顺序与 ThemeMode.entries 一致） */
@@ -61,7 +59,6 @@ fun SettingsScreen(
     }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val matchLevels by viewModel.matchLevels.collectAsStateWithLifecycle()
-    val blurEffect by viewModel.blurEffect.collectAsStateWithLifecycle()
     val updateCheck by viewModel.updateCheck.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
 
@@ -76,9 +73,7 @@ fun SettingsScreen(
         },
     ) { padding ->
         LazyColumn(
-            contentPadding = PaddingValues(
-                top = padding.calculateTopPadding(), bottom = 24.dp + LocalBottomBarInset.current,
-            ),
+            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = 24.dp),
             modifier = Modifier
                 .fillMaxSize()
                 .overScrollVertical()
@@ -93,12 +88,6 @@ fun SettingsScreen(
                         title = "主题模式",
                         summary = "选择应用的深浅色跟随方式",
                         onSelectedIndexChange = { viewModel.setThemeMode(ThemeMode.from(it)) },
-                    )
-                    SwitchPreference(
-                        checked = blurEffect,
-                        onCheckedChange = { viewModel.setBlurEffect(it) },
-                        title = "悬浮导航栏",
-                        summary = "导航栏悬浮且带有毛玻璃效果",
                     )
                 }
             }

@@ -41,9 +41,6 @@ class SettingsViewModel(
     val matchLevels: StateFlow<Set<String>> =
         container.settingsStore.matchLevels.stateIn(viewModelScope, SharingStarted.Eagerly, MATCH_LEVELS.toSet())
 
-    val blurEffect: StateFlow<Boolean> =
-        container.settingsStore.blurEffect.stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
     private val _updateCheck = MutableStateFlow<UpdateCheck>(UpdateCheck.Idle)
     val updateCheck: StateFlow<UpdateCheck> = _updateCheck.asStateFlow()
 
@@ -58,12 +55,6 @@ class SettingsViewModel(
         viewModelScope.launch {
             container.settingsStore.setMatchLevel(level, enabled)
             onWidgetDataChanged?.invoke()
-        }
-    }
-
-    fun setBlurEffect(enabled: Boolean) {
-        viewModelScope.launch {
-            container.settingsStore.setBlurEffect(enabled)
         }
     }
 

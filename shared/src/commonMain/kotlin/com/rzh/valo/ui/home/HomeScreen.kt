@@ -29,7 +29,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.data.MatchStatus
 import com.rzh.valo.data.formatCnDateWithWeekday
 import com.rzh.valo.ui.LocalAppContainer
-import com.rzh.valo.ui.LocalBottomBarInset
 import com.rzh.valo.ui.components.MatchCard
 import com.rzh.valo.ui.components.OnResumeEffect
 import com.rzh.valo.ui.components.SkeletonCards
@@ -96,9 +95,7 @@ fun HomeScreen(onOpenMatch: (String) -> Unit) {
 @Composable
 private fun HomeContent(state: HomeUiState, viewModel: HomeViewModel, onOpenMatch: (String) -> Unit) {
     LazyColumn(
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp + LocalBottomBarInset.current,
-        ),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
             .fillMaxSize()

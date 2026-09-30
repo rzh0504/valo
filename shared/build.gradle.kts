@@ -38,7 +38,6 @@ kotlin {
             implementation("top.yukonga.miuix.kmp:miuix-preference:$miuixVersion")
             implementation("top.yukonga.miuix.kmp:miuix-nav:$miuixVersion")
             implementation("top.yukonga.miuix.kmp:miuix-icons:$miuixVersion")
-            implementation("top.yukonga.miuix.kmp:miuix-blur:$miuixVersion")
             implementation("top.yukonga.miuix.kmp:miuix-squircle:$miuixVersion")
 
             implementation(compose.runtime)
