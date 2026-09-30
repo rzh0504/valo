@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.ui.LocalAppContainer
+import com.rzh.valo.ui.LocalBottomBarInset
 import com.rzh.valo.ui.components.DateRangePickerDialog
 import com.rzh.valo.ui.components.MatchCard
 import com.rzh.valo.ui.components.OnResumeEffect
@@ -137,7 +138,11 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
             TodayFab(
                 state = state,
                 listState = listState,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
+                // 毛玻璃底栏开启时悬浮于底栏之上（LocalBottomBarInset 关闭时为 0）
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(20.dp)
+                    .padding(bottom = LocalBottomBarInset.current),
             )
 
             // miuix 弹层依赖根 Scaffold 注册，必须位于 Scaffold content 子树内
@@ -171,7 +176,9 @@ private fun ScheduleList(
 ) {
     LazyColumn(
         state = listState,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            start = 20.dp, end = 20.dp, bottom = 32.dp + LocalBottomBarInset.current,
+        ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
             .fillMaxSize()

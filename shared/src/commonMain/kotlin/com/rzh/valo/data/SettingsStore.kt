@@ -36,6 +36,7 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
 
     private val themeKey = intPreferencesKey("theme_mode")
     private val matchLevelsKey = stringSetPreferencesKey("match_levels")
+    private val blurEffectKey = booleanPreferencesKey("blur_effect")
 
     val themeMode: Flow<ThemeMode> = dataStore.data.map {
         ThemeMode.from(it[themeKey] ?: ThemeMode.SYSTEM.id)
@@ -46,8 +47,17 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         (it[matchLevelsKey] ?: MATCH_LEVELS.toSet()).intersect(MATCH_LEVELS.toSet())
     }
 
+    /** 毛玻璃效果（悬浮模糊底栏）；默认关闭 */
+    val blurEffect: Flow<Boolean> = dataStore.data.map {
+        it[blurEffectKey] ?: false
+    }
+
     suspend fun setThemeMode(mode: ThemeMode) {
         dataStore.edit { it[themeKey] = mode.id }
+    }
+
+    suspend fun setBlurEffect(enabled: Boolean) {
+        dataStore.edit { it[blurEffectKey] = enabled }
     }
 
     suspend fun setMatchLevel(level: String, enabled: Boolean) {

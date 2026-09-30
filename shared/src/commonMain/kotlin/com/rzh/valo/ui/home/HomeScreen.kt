@@ -29,10 +29,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.data.MatchStatus
 import com.rzh.valo.data.formatCnDateWithWeekday
 import com.rzh.valo.ui.LocalAppContainer
+import com.rzh.valo.ui.LocalBottomBarInset
 import com.rzh.valo.ui.components.MatchCard
 import com.rzh.valo.ui.components.OnResumeEffect
 import com.rzh.valo.ui.components.SkeletonCards
 import com.rzh.valo.ui.components.bouncyPress
+import com.rzh.valo.ui.components.squircleShape
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -94,7 +96,9 @@ fun HomeScreen(onOpenMatch: (String) -> Unit) {
 @Composable
 private fun HomeContent(state: HomeUiState, viewModel: HomeViewModel, onOpenMatch: (String) -> Unit) {
     LazyColumn(
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp + LocalBottomBarInset.current,
+        ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
             .fillMaxSize()
@@ -188,7 +192,7 @@ private fun SummaryChip(label: String, count: Int, selected: Boolean, onClick: (
     val scheme = MiuixTheme.colorScheme
     val enabled = count > 0 || selected
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = squircleShape(16.dp),
         color = if (selected) scheme.primary else scheme.surfaceContainerHighest,
         contentColor = if (selected) scheme.onPrimary else scheme.onSurfaceVariantSummary,
         modifier = Modifier

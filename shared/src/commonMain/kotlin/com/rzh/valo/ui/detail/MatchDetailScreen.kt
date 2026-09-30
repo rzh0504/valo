@@ -85,6 +85,8 @@ import com.rzh.valo.ui.components.StatsTableHeaderRow
 import com.rzh.valo.ui.components.StatusPill
 import com.rzh.valo.ui.components.TeamLogo
 import com.rzh.valo.ui.components.bouncyPress
+import com.rzh.valo.ui.components.squircleShape
+import top.yukonga.miuix.kmp.squircle.squircleClip
 import com.rzh.valo.ui.components.tableZebraColor
 import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.basic.Card
@@ -205,7 +207,7 @@ private fun DetailContent(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = if (tournamentId != null) {
-                Modifier.clip(RoundedCornerShape(8.dp)).clickable { onOpenTournament(tournamentId, tournamentLabel) }
+                Modifier.squircleClip(8.dp).clickable { onOpenTournament(tournamentId, tournamentLabel) }
             } else {
                 Modifier
             },
@@ -994,7 +996,7 @@ private fun LinkPill(link: LinkInfo) {
     val urlOpener = rememberLocalUrlOpener()
     val interaction = remember { MutableInteractionSource() }
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = squircleShape(10.dp),
         color = scheme.surfaceContainer,
         modifier = Modifier
             .bouncyPress(interaction)
@@ -1245,7 +1247,7 @@ private fun TeamRecentRow(index: Int, team: Participant, match: MatchItem) {
 private fun ResultPill(won: Boolean) {
     val scheme = MiuixTheme.colorScheme
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = squircleShape(8.dp),
         color = if (won) scheme.primaryContainer else scheme.surfaceContainerHighest,
         contentColor = if (won) scheme.onPrimaryContainer else scheme.onSurfaceVariantSummary,
     ) {

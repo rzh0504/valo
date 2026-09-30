@@ -16,6 +16,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -37,6 +39,9 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
 import top.yukonga.miuix.kmp.utils.PagerNavigationSpringSpec
@@ -53,6 +58,9 @@ val LocalVersionName = staticCompositionLocalOf { "" }
 
 /** 设置变更后刷新桌面小组件的平台回调（Android 实现，其他平台为空） */
 val LocalWidgetRefresher = staticCompositionLocalOf<(suspend () -> Unit)?> { null }
+
+/** 毛玻璃悬浮底栏开启时，页面列表滚动末端需额外让出的底部高度；关闭时为 0 */
+val LocalBottomBarInset = staticCompositionLocalOf<Dp> { 0.dp }
 
 /** 兜底 ViewModelStoreOwner：保证 iOS 等无 Activity 宿主的平台 viewModel() 可用 */
 private class AppViewModelStoreOwner : ViewModelStoreOwner {
@@ -180,36 +188,50 @@ private fun MainTabs(
     onOpenScheduleFilter: () -> Unit,
     onOpenAbout: () -> Unit,
 ) {
+    val container = LocalAppContainer.current
+    val blurEnabled by container.settingsStore.blurEffect.collectAsStateWithLifecycle(false)
+    // 模糊依赖 RuntimeShader（Android 13+），不支持的设备静默保持普通底栏
+    val blurActive = blurEnabled && isRuntimeShaderSupported()
+    val backdrop = rememberLayerBackdrop()
+
     // 页签即 pager 页：点底部栏弹簧滑动到目标页（miuix example 惯用形态），
     // 页间也支持横滑；各页 rememberSaveable 状态由 pager 内置的 holder 保管
     val pagerState = rememberPagerState(pageCount = { 3 })
     val scope = rememberCoroutineScope()
 
-    Scaffold(
-        bottomBar = {
-            MainNavigationBar(
-                // targetPage 在点击动画开始时即指向目标页、手势翻页过半后跟随，高亮始终领先于落位
-                currentIndex = pagerState.targetPage,
-                onSelect = { index -> scope.launch { pagerState.springAnimateToPage(index) } },
-            )
-        },
-    ) { padding ->
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()),
-            flingBehavior = PagerDefaults.flingBehavior(
-                state = pagerState,
-                snapAnimationSpec = PagerNavigationSpringSpec,
-            ),
-            verticalAlignment = Alignment.Top,
-        ) { page ->
-            when (page) {
-                0 -> HomeScreen(onOpenMatch = onOpenMatch)
-                1 -> ScheduleScreen(onOpenMatch = onOpenMatch)
-                else -> SettingsScreen(
-                    onOpenScheduleFilter = onOpenScheduleFilter,
-                    onOpenAbout = onOpenAbout,
+    CompositionLocalProvider(LocalBottomBarInset provides bottomBarInset(blurActive)) {
+        Scaffold(
+            bottomBar = {
+                MainNavigationBar(
+                    // targetPage 在点击动画开始时即指向目标页、手势翻页过半后跟随，高亮始终领先于落位
+                    currentIndex = pagerState.targetPage,
+                    onSelect = { index -> scope.launch { pagerState.springAnimateToPage(index) } },
+                    backdrop = backdrop,
+                    blurActive = blurActive,
                 )
+            },
+        ) { padding ->
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (blurActive) Modifier.layerBackdrop(backdrop) else Modifier)
+                    // 毛玻璃开启时内容延伸到底栏之下、透出模糊背景，列表末端由 LocalBottomBarInset 让位
+                    .padding(bottom = if (blurActive) 0.dp else padding.calculateBottomPadding()),
+                flingBehavior = PagerDefaults.flingBehavior(
+                    state = pagerState,
+                    snapAnimationSpec = PagerNavigationSpringSpec,
+                ),
+                verticalAlignment = Alignment.Top,
+            ) { page ->
+                when (page) {
+                    0 -> HomeScreen(onOpenMatch = onOpenMatch)
+                    1 -> ScheduleScreen(onOpenMatch = onOpenMatch)
+                    else -> SettingsScreen(
+                        onOpenScheduleFilter = onOpenScheduleFilter,
+                        onOpenAbout = onOpenAbout,
+                    )
+                }
             }
         }
     }
