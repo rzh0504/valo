@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  android:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -35,13 +35,58 @@ jobs:
       - name: 构建 release APK（版本号取自 tag）
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleRelease -PvaloVersionName="${GITHUB_REF_NAME#v}"
+          ./gradlew :androidApp:assembleRelease -PvaloVersionName="${GITHUB_REF_NAME#v}"
 
       - name: 以 tag 命名产物
-        run: cp app/build/outputs/apk/release/app-release.apk "valo-${GITHUB_REF_NAME}.apk"
+        run: cp androidApp/build/outputs/apk/release/app-release.apk "valo-${GITHUB_REF_NAME}.apk"
 
       - name: 上传到 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: valo-${{ github.ref_name }}.apk
           generate_release_notes: true
+
+  # 未签名 IPA：工程无共享 scheme，用 -target 构建；关闭签名（CODE_SIGNING_ALLOWED=NO），
+  # 用户拿到后经 Sideloadly / AltStore / TrollStore 自签安装
+  ios:
+    needs: android
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: 构建 iOS App（未签名）
+        run: |
+          chmod +x gradlew
+          xcodebuild \
+            -project iosApp/iosApp.xcodeproj \
+            -target iosApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/ios \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY= \
+            build
+
+      - name: 打包未签名 IPA
+        run: |
+          APP_PATH=$(find build/ios/Build/Products -type d -name "*.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::未找到 .app 构建产物"
+            exit 1
+          fi
+          rm -rf Payload
+          mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          zip -qr "valo-${GITHUB_REF_NAME}-ios-unsigned.ipa" Payload
+
+      - name: 上传到 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: valo-${{ github.ref_name }}-ios-unsigned.ipa

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- debug 构建的应用名/小组件名覆盖：与 release 版在桌面区分 -->
+<resources>
+    <string name="app_name">Valo debug</string>
+    <string name="widget_label">Valo debug</string>
+</resources>
