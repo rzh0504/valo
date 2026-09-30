@@ -46,6 +46,39 @@ jobs:
             CODE_SIGN_IDENTITY= \
             build
 
+      - name: 构建 iOS 模拟器版（Appetize 等云模拟器用）
+        run: |
+          xcodebuild \
+            -project iosApp/iosApp.xcodeproj \
+            -target iosApp \
+            -configuration Release \
+            -sdk iphonesimulator \
+            SYMROOT="$PWD/build/ios-sim" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY= \
+            build
+
+      - name: 打包模拟器 .app（置于 zip 根目录，macOS 打包保留执行权限）
+        run: |
+          SIM_APP=$(find build/ios-sim -type d -name "*.app" | head -n 1)
+          if [ -z "$SIM_APP" ]; then
+            echo "::error::未找到模拟器 .app 构建产物"
+            exit 1
+          fi
+          RELEASE_TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$RELEASE_TAG" ]; then
+            RELEASE_TAG="${GITHUB_REF_NAME}"
+          fi
+          cd "$(dirname "$SIM_APP")"
+          zip -qr "$GITHUB_WORKSPACE/valo-${RELEASE_TAG}-ios-simulator.zip" "$(basename "$SIM_APP")"
+          echo "SIM_ZIP=valo-${RELEASE_TAG}-ios-simulator.zip" >> "$GITHUB_ENV"
+
+      - name: 上传模拟器构建（Artifact）
+        uses: actions/upload-artifact@v4
+        with:
+          name: valo-ios-simulator
+          path: ${{ env.SIM_ZIP }}
+
       - name: 打包未签名 IPA
         run: |
           APP_PATH=$(find build/ios-products -type d -name "*.app" | head -n 1)
