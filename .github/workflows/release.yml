@@ -38,7 +38,7 @@ jobs:
           ./gradlew :androidApp:assembleRelease -PvaloVersionName="${GITHUB_REF_NAME#v}"
 
       - name: 以 tag 命名产物
-        run: cp androidApp/build/outputs/apk/release/app-release.apk "valo-${GITHUB_REF_NAME}.apk"
+        run: cp androidApp/build/outputs/apk/release/androidApp-release.apk "valo-${GITHUB_REF_NAME}.apk"
 
       - name: 上传到 GitHub Release
         uses: softprops/action-gh-release@v2
