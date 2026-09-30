@@ -1,0 +1,78 @@
+# iOS 未签名 IPA 构建：与 Android Release 相互独立，修 CI 时互不重跑
+# - tag 推送（v*）：构建并附加到同名 Release
+# - 手动触发：输入 tag 则附加到对应 Release（可给已发布的 Release 补 IPA），
+#   留空则只上传构建产物（用于调试构建本身）
+name: iOS Build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要附加 IPA 的 Release tag（如 v1.0.5，留空只传 Artifact）"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # 工程无共享 scheme，用 -target 构建；-derivedDataPath 与 -target 不兼容，
+      # 改传 SYMROOT 指定产物目录；关闭签名，用户经 Sideloadly / AltStore /
+      # TrollStore 自签安装
+      - name: 构建 iOS App（未签名）
+        run: |
+          chmod +x gradlew
+          xcodebuild \
+            -project iosApp/iosApp.xcodeproj \
+            -target iosApp \
+            -configuration Release \
+            -sdk iphoneos \
+            SYMROOT="$PWD/build/ios-products" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY= \
+            build
+
+      - name: 打包未签名 IPA
+        run: |
+          APP_PATH=$(find build/ios-products -type d -name "*.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::未找到 .app 构建产物"
+            exit 1
+          fi
+          rm -rf Payload
+          mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          RELEASE_TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$RELEASE_TAG" ]; then
+            RELEASE_TAG="${GITHUB_REF_NAME}"
+          fi
+          zip -qr "valo-${RELEASE_TAG}-ios-unsigned.ipa" Payload
+          echo "IPA_NAME=valo-${RELEASE_TAG}-ios-unsigned.ipa" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+
+      - name: 上传构建产物（Artifact）
+        uses: actions/upload-artifact@v4
+        with:
+          name: valo-ios-unsigned
+          path: ${{ env.IPA_NAME }}
+
+      - name: 附加到 GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: ${{ env.IPA_NAME }}
