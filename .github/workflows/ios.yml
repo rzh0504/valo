@@ -1,16 +1,12 @@
-# iOS 未签名 IPA 构建：与 Android Release 相互独立，修 CI 时互不重跑
-# - tag 推送（v*）：构建并附加到同名 Release
-# - 手动触发：输入 tag 则附加到对应 Release（可给已发布的 Release 补 IPA），
-#   留空则只上传构建产物（用于调试构建本身）
+# iOS 未签名构建的手动触发入口：修 iOS CI 或给已发布 Release 补产物时单独跑，
+# 不连带动 Android。发版（tag 推送）走 release.yml，会并行构建 Android + iOS。
 name: iOS Build
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: "要附加 IPA 的 Release tag（如 v1.0.5，留空只传 Artifact）"
+        description: "要附加产物的 Release tag（如 v1.0.6，留空只传 Artifact）"
         required: false
         default: ""
 
@@ -61,32 +57,16 @@ jobs:
             CODE_SIGN_IDENTITY= \
             build
 
-      - name: 打包模拟器 .app（置于 zip 根目录，macOS 打包保留执行权限）
-        run: |
-          SIM_APP=$(find build/ios-sim -type d -name "*.app" | head -n 1)
-          if [ -z "$SIM_APP" ]; then
-            echo "::error::未找到模拟器 .app 构建产物"
-            exit 1
-          fi
-          RELEASE_TAG="${{ github.event.inputs.tag }}"
-          if [ -z "$RELEASE_TAG" ]; then
-            RELEASE_TAG="${GITHUB_REF_NAME}"
-          fi
-          cd "$(dirname "$SIM_APP")"
-          zip -qr "$GITHUB_WORKSPACE/valo-${RELEASE_TAG}-ios-simulator.zip" "$(basename "$SIM_APP")"
-          echo "SIM_ZIP=valo-${RELEASE_TAG}-ios-simulator.zip" >> "$GITHUB_ENV"
-
-      - name: 上传模拟器构建（Artifact）
-        uses: actions/upload-artifact@v4
-        with:
-          name: valo-ios-simulator
-          path: ${{ env.SIM_ZIP }}
-
-      - name: 打包未签名 IPA
+      - name: 打包产物
         run: |
           APP_PATH=$(find build/ios-products -type d -name "*.app" | head -n 1)
           if [ -z "$APP_PATH" ]; then
             echo "::error::未找到 .app 构建产物"
+            exit 1
+          fi
+          SIM_APP=$(find build/ios-sim -type d -name "*.app" | head -n 1)
+          if [ -z "$SIM_APP" ]; then
+            echo "::error::未找到模拟器 .app 构建产物"
             exit 1
           fi
           rm -rf Payload
@@ -97,18 +77,26 @@ jobs:
             RELEASE_TAG="${GITHUB_REF_NAME}"
           fi
           zip -qr "valo-${RELEASE_TAG}-ios-unsigned.ipa" Payload
+          cd "$(dirname "$SIM_APP")"
+          zip -qr "$GITHUB_WORKSPACE/valo-${RELEASE_TAG}-ios-simulator.zip" "$(basename "$SIM_APP")"
           echo "IPA_NAME=valo-${RELEASE_TAG}-ios-unsigned.ipa" >> "$GITHUB_ENV"
+          echo "SIM_ZIP=valo-${RELEASE_TAG}-ios-simulator.zip" >> "$GITHUB_ENV"
           echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
 
+      # 手动触发的 Artifact 会再包一层 zip，解压后即是可用的 ipa / 模拟器包
       - name: 上传构建产物（Artifact）
         uses: actions/upload-artifact@v4
         with:
-          name: valo-ios-unsigned
-          path: ${{ env.IPA_NAME }}
+          name: valo-ios
+          path: |
+            ${{ env.IPA_NAME }}
+            ${{ env.SIM_ZIP }}
 
       - name: 附加到 GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.tag != ''
+        if: github.event.inputs.tag != ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          files: ${{ env.IPA_NAME }}
+          files: |
+            ${{ env.IPA_NAME }}
+            ${{ env.SIM_ZIP }}

@@ -8,8 +8,25 @@ permissions:
   contents: write
 
 jobs:
+  # 先建 Release（带自动变更说明），Android / iOS 两个构建 job 再并行附加产物，
+  # 避免两边并发创建同一 Release 的竞争
+  create-release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 创建 Release（已存在则跳过）
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "Release 已存在，跳过创建"
+          else
+            gh release create "$GITHUB_REF_NAME" --generate-notes
+          fi
+
   android:
-    runs-on: ubuntu-latest
+    needs: create-release
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -44,4 +61,74 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: valo-${{ github.ref_name }}.apk
-          generate_release_notes: true
+
+  # 未签名 IPA + 模拟器构建：工程无共享 scheme，用 -target 构建；
+  # -derivedDataPath 与 -target 不兼容，改传 SYMROOT 指定产物目录
+  ios:
+    needs: create-release
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: 构建 iOS App（未签名）
+        run: |
+          chmod +x gradlew
+          xcodebuild \
+            -project iosApp/iosApp.xcodeproj \
+            -target iosApp \
+            -configuration Release \
+            -sdk iphoneos \
+            SYMROOT="$PWD/build/ios-products" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY= \
+            build
+
+      # 只构建 arm64：工程未注册 iosX64，Compose 的资源同步任务遇到 x86_64 会
+      # 报 "Unknown iOS simulator arch"；Appetize 官方也推荐 ARM 模拟器构建
+      - name: 构建 iOS 模拟器版（Appetize 等云模拟器用）
+        run: |
+          xcodebuild \
+            -project iosApp/iosApp.xcodeproj \
+            -target iosApp \
+            -configuration Release \
+            -sdk iphonesimulator \
+            ARCHS=arm64 \
+            SYMROOT="$PWD/build/ios-sim" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY= \
+            build
+
+      # IPA：Payload/<App>.app 结构，供真机自签；模拟器包：.app 置于 zip 根目录
+      # （Appetize 要求，macOS 打包保留执行权限位），供云模拟器直接上传
+      - name: 打包产物
+        run: |
+          APP_PATH=$(find build/ios-products -type d -name "*.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::未找到 .app 构建产物"
+            exit 1
+          fi
+          SIM_APP=$(find build/ios-sim -type d -name "*.app" | head -n 1)
+          if [ -z "$SIM_APP" ]; then
+            echo "::error::未找到模拟器 .app 构建产物"
+            exit 1
+          fi
+          rm -rf Payload
+          mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          zip -qr "valo-${GITHUB_REF_NAME}-ios-unsigned.ipa" Payload
+          cd "$(dirname "$SIM_APP")"
+          zip -qr "$GITHUB_WORKSPACE/valo-${GITHUB_REF_NAME}-ios-simulator.zip" "$(basename "$SIM_APP")"
+
+      - name: 上传到 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            valo-${{ github.ref_name }}-ios-unsigned.ipa
+            valo-${{ github.ref_name }}-ios-simulator.zip
