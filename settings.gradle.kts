@@ -18,3 +18,4 @@ rootProject.name = "valo"
 
 include(":shared")
 include(":androidApp")
+include(":baselineprofile")

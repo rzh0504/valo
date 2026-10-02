@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("androidx.baselineprofile")
 }
 
 // 本地签名配置（keystore.properties 不入库，首次构建前用 keytool 生成 jks）
@@ -61,6 +62,10 @@ android {
 
 dependencies {
     implementation(project(":shared"))
+    baselineProfile(project(":baselineprofile"))
+
+    // 随 APK 分发的 baseline profile 在 API 26-29 上需要 profileinstaller 落盘
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.activity:activity-compose:1.13.0")
