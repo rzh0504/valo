@@ -73,7 +73,7 @@ fun AboutScreen(onBack: () -> Unit) {
                     Card(modifier = Modifier.padding(horizontal = 12.dp)) {
                         BasicComponent(
                             title = "版本",
-                            summary = versionName.ifBlank { "1.0.7" },
+                            summary = versionName.ifBlank { "1.0.8" },
                         )
                         ArrowPreference(
                             title = "开源仓库",

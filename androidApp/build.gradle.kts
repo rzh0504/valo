@@ -20,9 +20,9 @@ android {
         applicationId = "com.rzh.valo"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
+        versionCode = 9
         // CI 发版时由 tag 覆盖（-PvaloVersionName=x.y.z），本地构建保持默认
-        versionName = findProperty("valoVersionName")?.toString() ?: "1.0.7"
+        versionName = findProperty("valoVersionName")?.toString() ?: "1.0.8"
     }
 
     signingConfigs {

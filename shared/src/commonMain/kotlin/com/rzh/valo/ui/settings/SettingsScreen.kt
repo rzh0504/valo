@@ -106,7 +106,7 @@ fun SettingsScreen(
                 Card(modifier = Modifier.padding(horizontal = 12.dp)) {
                     ArrowPreference(
                         title = "关于",
-                        summary = versionName.ifBlank { "1.0.7" },
+                        summary = versionName.ifBlank { "1.0.8" },
                         onClick = onOpenAbout,
                     )
                     ArrowPreference(
