@@ -32,19 +32,26 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * [StatsTableHeaderRow] / [StatsTableCell] / [tableZebraColor] 提供表头带与行内单元格。
  */
 
-/** 数据表区块卡：标题在卡外，卡内边距为 0，行内容自行布局（表头带 + 斑马行） */
+/** 数据表区块卡：标题在卡外（右侧可带快捷动作），卡内边距为 0，行内容自行布局（表头带 + 斑马行） */
 @Composable
 fun StatsTableCard(
     title: String,
+    action: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val scheme = MiuixTheme.colorScheme
     Column {
-        Text(
-            title,
-            style = MiuixTheme.textStyles.footnote1,
-            color = scheme.onSurfaceVariantSummary,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                title,
+                style = MiuixTheme.textStyles.footnote1,
+                color = scheme.onSurfaceVariantSummary,
+            )
+            if (action != null) {
+                Spacer(Modifier.weight(1f))
+                action()
+            }
+        }
         Spacer(Modifier.height(8.dp))
         Card(
             cornerRadius = 16.dp,

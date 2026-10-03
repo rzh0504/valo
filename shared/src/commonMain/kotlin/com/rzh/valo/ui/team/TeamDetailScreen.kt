@@ -1,5 +1,10 @@
 package com.rzh.valo.ui.team
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -36,16 +42,14 @@ import com.rzh.valo.data.PlayerStatsRow
 import com.rzh.valo.data.RosterMember
 import com.rzh.valo.data.TeamBase
 import com.rzh.valo.data.TeamMapStats
-import com.rzh.valo.data.TeamRecord
 import com.rzh.valo.data.TeamReward
-import com.rzh.valo.data.TeamStats
-import com.rzh.valo.data.MatchItem
+import com.rzh.valo.data.epochToLocalDate
+import com.rzh.valo.data.formatCnDate
 import com.rzh.valo.data.formatFixed
-import com.rzh.valo.data.percentText
+import com.rzh.valo.data.formatTime
 import com.rzh.valo.ui.LocalAppContainer
 import com.rzh.valo.ui.Route
 import com.rzh.valo.ui.components.LoadingPane
-import com.rzh.valo.ui.components.MatchCard
 import com.rzh.valo.ui.components.StatsTableCard
 import com.rzh.valo.ui.components.StatsTableCell
 import com.rzh.valo.ui.components.StatsTableHeaderRow
@@ -65,7 +69,7 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
-/** 战队详情：基础信息、近期比赛、战队数据、地图胜率、赛事名次与选手名单，近期比赛可点进比赛详情 */
+/** 战队详情：基础信息、近期比赛、地图胜率、赛事名次、选手名单与选手数据，近期比赛行可点进比赛详情 */
 @Composable
 fun TeamDetailScreen(
     route: Route.TeamInfo,
@@ -128,40 +132,38 @@ fun TeamDetailScreen(
                     Spacer(Modifier.height(4.dp))
                     TeamHeaderCard(state.base, route)
                     Spacer(Modifier.height(12.dp))
-                    RecentMatchesSection(
-                        matches = state.recentMatches,
-                        onOpenMatch = onOpenMatch,
-                        onOpenSchedule = onOpenSchedule,
-                    )
-                    state.record?.let { record ->
+                    if (state.detailsLoading) {
+                        DetailsSkeleton()
+                    } else {
+                        RecentMatchesSection(
+                            matches = state.recentMatches,
+                            onOpenMatch = onOpenMatch,
+                            onOpenSchedule = onOpenSchedule,
+                        )
                         state.stats?.let { stats ->
-                            Spacer(Modifier.height(12.dp))
-                            TeamStatsCard(stats, record)
+                            val maps = stats.mapStats.filter { it.games > 0 }.sortedByDescending { it.games }
+                            if (maps.isNotEmpty()) {
+                                Spacer(Modifier.height(12.dp))
+                                TeamMapCard(maps)
+                            }
                         }
-                    }
-                    state.stats?.let { stats ->
-                        val maps = stats.mapStats.filter { it.games > 0 }.sortedByDescending { it.games }
-                        if (maps.isNotEmpty()) {
+                        if (state.rewards.isNotEmpty()) {
                             Spacer(Modifier.height(12.dp))
-                            TeamMapCard(maps)
+                            TeamRewardCard(state.rewards)
                         }
-                    }
-                    if (state.rewards.isNotEmpty()) {
-                        Spacer(Modifier.height(12.dp))
-                        TeamRewardCard(state.rewards)
-                    }
-                    state.roster?.let { roster ->
-                        if (roster.active.isNotEmpty()) {
+                        state.roster?.let { roster ->
+                            if (roster.active.isNotEmpty()) {
+                                Spacer(Modifier.height(12.dp))
+                                TeamRosterCard(roster.active)
+                            }
+                        }
+                        val activePlayers = state.playerStats
+                            .filter { it.isActive && it.rounds > 0 }
+                            .sortedByDescending { it.acs }
+                        if (activePlayers.isNotEmpty()) {
                             Spacer(Modifier.height(12.dp))
-                            TeamRosterCard(roster.active)
+                            PlayerStatsCard(activePlayers)
                         }
-                    }
-                    val activePlayers = state.playerStats
-                        .filter { it.isActive && it.rounds > 0 }
-                        .sortedByDescending { it.acs }
-                    if (activePlayers.isNotEmpty()) {
-                        Spacer(Modifier.height(12.dp))
-                        PlayerStatsCard(activePlayers)
                     }
                     Spacer(Modifier.height(24.dp))
                 }
@@ -170,49 +172,123 @@ fun TeamDetailScreen(
     }
 }
 
-/** 近期比赛：最近 5 场对局卡；标题行右侧带"全部赛程"快捷跳转 */
+/** 近期比赛：斑马表格列最近 5 场（比分按战队视角，胜场强调），标题行右侧"全部赛程"快捷跳转 */
 @Composable
 private fun RecentMatchesSection(
-    matches: List<MatchItem>,
+    matches: List<RecentMatchRow>,
     onOpenMatch: (String) -> Unit,
     onOpenSchedule: () -> Unit,
 ) {
     val scheme = MiuixTheme.colorScheme
-    Column {
+    StatsTableCard(title = "近期比赛", action = {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(
-                "近期比赛",
-                style = MiuixTheme.textStyles.footnote1,
-                color = scheme.onSurfaceVariantSummary,
-            )
-            Spacer(Modifier.weight(1f))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clickable(onClick = onOpenSchedule)
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-            ) {
-                Text(
-                    "全部赛程",
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = scheme.primary,
-                )
-                Icon(
-                    Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                    contentDescription = "进入全部赛程",
-                    tint = scheme.primary,
-                    modifier = Modifier.size(14.dp),
-                )
+                    .padding(start = 8.dp, top = 2.dp, bottom = 2.dp),
+        ) {
+            Text(
+                "全部赛程",
+                style = MiuixTheme.textStyles.footnote1,
+                color = scheme.primary,
+            )
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = "进入全部赛程",
+                tint = scheme.primary,
+                modifier = Modifier.size(14.dp),
+            )
+        }
+    }) {
+        if (matches.isEmpty()) {
+            Text(
+                "暂无近期比赛",
+                style = MiuixTheme.textStyles.body2,
+                color = scheme.onSurfaceVariantSummary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+            )
+        } else {
+            StatsTableHeaderRow("对阵", listOf("比分" to 64.dp))
+            matches.forEachIndexed { index, match ->
+                val meta = listOfNotNull(
+                    match.eventLabel.takeIf { it.isNotBlank() },
+                    formatCnDate(epochToLocalDate(match.startTime)) + " " + formatTime(match.startTime),
+                ).joinToString(" · ")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(tableZebraColor(index, scheme))
+                        .clickable { onOpenMatch(match.matchId) }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        TeamLogo(match.opponent?.icon, size = 20)
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                match.opponent?.displayName ?: "待定",
+                                style = MiuixTheme.textStyles.body2,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                meta,
+                                style = MiuixTheme.textStyles.footnote2,
+                                color = scheme.onSurfaceVariantSummary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    StatsTableCell(
+                        "${match.ownScore} : ${match.oppScore}",
+                        64.dp,
+                        emphasized = match.won == true,
+                    )
+                }
             }
         }
-        if (matches.isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            matches.forEachIndexed { index, match ->
-                if (index > 0) Spacer(Modifier.height(12.dp))
-                MatchCard(item = match, onClick = { onOpenMatch(match.id) })
+    }
+}
+
+/** 区块加载骨架：两张表格形状的灰色脉冲占位，数据就位后整批替换，避免内容闪现 */
+@Composable
+private fun DetailsSkeleton() {
+    val transition = rememberInfiniteTransition(label = "teamDetailSkeleton")
+    val pulse by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.45f,
+        animationSpec = infiniteRepeatable(tween(650), RepeatMode.Reverse),
+        label = "teamDetailPulse",
+    )
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.alpha(pulse),
+    ) {
+        SkeletonTable(rows = 6)
+        SkeletonTable(rows = 3)
+    }
+}
+
+@Composable
+private fun SkeletonTable(rows: Int) {
+    val scheme = MiuixTheme.colorScheme
+    val block = scheme.surfaceContainerHighest
+    Card(
+        cornerRadius = 16.dp,
+        colors = CardDefaults.defaultColors(color = scheme.surfaceContainer),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            repeat(rows) {
+                Box(Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(4.dp)).background(block))
             }
         }
     }
@@ -245,42 +321,6 @@ private fun TeamHeaderCard(base: TeamBase?, route: Route.TeamInfo) {
                     textAlign = TextAlign.Center,
                 )
             }
-        }
-    }
-}
-
-/** 战队数据：近期（约 2026 年内）与队史两组胜率 */
-@Composable
-private fun TeamStatsCard(stats: TeamStats, record: TeamRecord) {
-    SectionCard(title = "战队数据") {
-        Row(Modifier.fillMaxWidth()) {
-            StatCell(
-                label = "近期胜率",
-                value = percentText(stats.matchWinCount, stats.matchCount),
-                sub = "${stats.matchWinCount}胜${stats.matchCount - stats.matchWinCount}负",
-                modifier = Modifier.weight(1f),
-            )
-            StatCell(
-                label = "近期地图",
-                value = percentText(stats.gameWinCount, stats.gameCount),
-                sub = "${stats.gameWinCount}胜${stats.gameCount - stats.gameWinCount}局",
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth()) {
-            StatCell(
-                label = "队史比赛",
-                value = percentText(record.matchWinCount, record.matchCount),
-                sub = "${record.matchWinCount}胜${record.matchCount - record.matchWinCount}负",
-                modifier = Modifier.weight(1f),
-            )
-            StatCell(
-                label = "队史回合",
-                value = percentText(record.roundWinCount, record.roundCount),
-                sub = "${record.roundWinCount}胜${record.roundCount - record.roundWinCount}回合",
-                modifier = Modifier.weight(1f),
-            )
         }
     }
 }
@@ -473,29 +513,6 @@ private fun PlayerStatsCard(players: List<PlayerStatsRow>) {
                 StatsTableCell("${player.kast.roundToInt()}%", 52.dp)
             }
         }
-    }
-}
-
-@Composable
-private fun StatCell(label: String, value: String, sub: String, modifier: Modifier = Modifier) {
-    val scheme = MiuixTheme.colorScheme
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            value,
-            style = MiuixTheme.textStyles.title3,
-            fontWeight = FontWeight.Bold,
-            color = scheme.primary,
-        )
-        Text(
-            label,
-            style = MiuixTheme.textStyles.footnote1,
-            color = scheme.onSurfaceVariantSummary,
-        )
-        Text(
-            sub,
-            style = MiuixTheme.textStyles.footnote2,
-            color = scheme.onSurfaceVariantSummary,
-        )
     }
 }
 
