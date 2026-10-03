@@ -11,7 +11,7 @@ import platform.Foundation.NSHomeDirectory
 import platform.Foundation.NSUserDomainMask
 
 /** iOS 应用版本号（随版本发布更新） */
-private const val IOS_VERSION_NAME = "1.0.6"
+private const val IOS_VERSION_NAME = "1.0.7"
 
 fun MainViewController() = ComposeUIViewController {
     val container = remember { AppContainer(iosFilesDir()) }
