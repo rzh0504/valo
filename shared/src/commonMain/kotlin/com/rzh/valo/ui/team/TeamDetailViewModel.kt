@@ -2,7 +2,9 @@ package com.rzh.valo.ui.team
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rzh.valo.data.MatchItem
 import com.rzh.valo.data.MatchRepository
+import com.rzh.valo.data.Participant
 import com.rzh.valo.data.PlayerStatsRow
 import com.rzh.valo.data.TeamBase
 import com.rzh.valo.data.TeamRecord
@@ -28,15 +30,19 @@ data class TeamDetailUiState(
     val record: TeamRecord? = null,
     val playerStats: List<PlayerStatsRow> = emptyList(),
     val rewards: List<TeamReward> = emptyList(),
+    val recentMatches: List<MatchItem> = emptyList(),
 )
 
 /**
- * 战队详情：基础信息 / 名单 / 战队数据 / 选手数据 / 赛事名次。
+ * 战队详情：基础信息 / 名单 / 战队数据 / 选手数据 / 赛事名次 / 近期比赛。
  * 基础信息成败决定整页成败，其余数据各自独立加载，失败不互相阻塞。
  */
 class TeamDetailViewModel(
     private val repository: MatchRepository,
     private val teamId: String,
+    private val teamName: String = "",
+    private val teamShort: String = "",
+    private val teamIcon: String? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(TeamDetailUiState())
@@ -88,6 +94,9 @@ class TeamDetailViewModel(
         val rewards = async {
             runCatching { repository.teamReward(teamId, force) }.getOrDefault(emptyList())
         }
+        val recent = async {
+            runCatching { fetchRecentMatches(force) }.getOrDefault(emptyList())
+        }
         _state.update {
             it.copy(
                 roster = roster.await() ?: it.roster,
@@ -95,7 +104,55 @@ class TeamDetailViewModel(
                 record = record.await() ?: it.record,
                 playerStats = playerStats.await().ifEmpty { it.playerStats },
                 rewards = rewards.await().ifEmpty { it.rewards },
+                recentMatches = recent.await().ifEmpty { it.recentMatches },
             )
         }
+    }
+
+    /**
+     * 战队最近 [RECENT_COUNT] 场：接口没有按战队过滤的参数，整站倒序分页按战队过滤，凑满即停。
+     * 分页缓存与战队赛程页共享，后续点进完整赛程不产生额外请求。
+     */
+    private suspend fun fetchRecentMatches(force: Boolean): List<MatchItem> {
+        val collected = ArrayList<MatchItem>()
+        var page = 1
+        while (page <= RECENT_MAX_PAGES && collected.size < RECENT_COUNT) {
+            val data = repository.recentMatchesPage(page, force)
+            collected += data.list.filter { sideOf(it) != 0 }
+            if (data.list.size < MatchRepository.PAGE_SIZE) break
+            page++
+        }
+        return collected.take(RECENT_COUNT)
+    }
+
+    /** 目标战队在该比赛中的阵营：1 主队 · 2 客队 · 0 不在场（与战队赛程页同一套匹配规则） */
+    private fun sideOf(item: MatchItem): Int {
+        val versus = item.versus ?: return 0
+        if (versus.mainCamp?.firstOrNull()?.let(::sameTeam) == true) return 1
+        if (versus.guestCamp?.firstOrNull()?.let(::sameTeam) == true) return 2
+        return 0
+    }
+
+    private fun sameTeam(a: Participant): Boolean {
+        val base = _state.value.base
+        if (a.id != null && a.id == teamId) return true
+        if (a.icon != null && listOfNotNull(teamIcon, base?.icon).any { it == a.icon }) return true
+        val names = setOfNotNull(a.nameMain, a.nameShort)
+            .filter { it.isNotBlank() }
+            .map { it.lowercase() }
+            .toSet()
+        val targets = setOfNotNull(
+            teamName.takeIf { it.isNotBlank() },
+            teamShort.takeIf { it.isNotBlank() },
+            base?.displayName?.takeIf { it.isNotBlank() },
+        ).map { it.lowercase() }.toSet()
+        return names.isNotEmpty() && names.intersect(targets).isNotEmpty()
+    }
+
+    companion object {
+        /** 详情页展示的近期比赛场数 */
+        private const val RECENT_COUNT = 5
+        /** 凑满近期比赛的整站分页上限（每页 100 场） */
+        private const val RECENT_MAX_PAGES = 5
     }
 }

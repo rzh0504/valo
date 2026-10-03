@@ -2,6 +2,7 @@ package com.rzh.valo.ui.team
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -37,19 +39,19 @@ import com.rzh.valo.data.TeamMapStats
 import com.rzh.valo.data.TeamRecord
 import com.rzh.valo.data.TeamReward
 import com.rzh.valo.data.TeamStats
+import com.rzh.valo.data.MatchItem
 import com.rzh.valo.data.formatFixed
 import com.rzh.valo.data.percentText
 import com.rzh.valo.ui.LocalAppContainer
 import com.rzh.valo.ui.Route
 import com.rzh.valo.ui.components.LoadingPane
+import com.rzh.valo.ui.components.MatchCard
 import com.rzh.valo.ui.components.StatsTableCard
 import com.rzh.valo.ui.components.StatsTableCell
 import com.rzh.valo.ui.components.StatsTableHeaderRow
 import com.rzh.valo.ui.components.TeamLogo
 import com.rzh.valo.ui.components.tableZebraColor
 import kotlin.math.roundToInt
-import top.yukonga.miuix.kmp.basic.Button
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
@@ -63,16 +65,23 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
-/** 战队详情：基础信息、战队数据、地图胜率、赛事名次、选手名单与选手数据，赛程跳完整赛程页 */
+/** 战队详情：基础信息、近期比赛、战队数据、地图胜率、赛事名次与选手名单，近期比赛可点进比赛详情 */
 @Composable
 fun TeamDetailScreen(
     route: Route.TeamInfo,
     onBack: () -> Unit,
     onOpenSchedule: () -> Unit,
+    onOpenMatch: (String) -> Unit,
 ) {
     val container = LocalAppContainer.current
     val viewModel: TeamDetailViewModel = viewModel(key = "teaminfo_${route.teamId}") {
-        TeamDetailViewModel(container.repository, route.teamId)
+        TeamDetailViewModel(
+            container.repository,
+            route.teamId,
+            route.name,
+            route.short,
+            route.icon.takeIf { it.isNotBlank() },
+        )
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -119,19 +128,11 @@ fun TeamDetailScreen(
                     Spacer(Modifier.height(4.dp))
                     TeamHeaderCard(state.base, route)
                     Spacer(Modifier.height(12.dp))
-                    // 显眼的全部赛程入口（原页面底部的箭头条目已移除）
-                    Button(
-                        onClick = onOpenSchedule,
-                        colors = ButtonDefaults.buttonColorsPrimary(),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            "全部赛程",
-                            style = MiuixTheme.textStyles.body1,
-                            fontWeight = FontWeight.Medium,
-                            color = MiuixTheme.colorScheme.onPrimary,
-                        )
-                    }
+                    RecentMatchesSection(
+                        matches = state.recentMatches,
+                        onOpenMatch = onOpenMatch,
+                        onOpenSchedule = onOpenSchedule,
+                    )
                     state.record?.let { record ->
                         state.stats?.let { stats ->
                             Spacer(Modifier.height(12.dp))
@@ -164,6 +165,54 @@ fun TeamDetailScreen(
                     }
                     Spacer(Modifier.height(24.dp))
                 }
+            }
+        }
+    }
+}
+
+/** 近期比赛：最近 5 场对局卡；标题行右侧带"全部赛程"快捷跳转 */
+@Composable
+private fun RecentMatchesSection(
+    matches: List<MatchItem>,
+    onOpenMatch: (String) -> Unit,
+    onOpenSchedule: () -> Unit,
+) {
+    val scheme = MiuixTheme.colorScheme
+    Column {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                "近期比赛",
+                style = MiuixTheme.textStyles.footnote1,
+                color = scheme.onSurfaceVariantSummary,
+            )
+            Spacer(Modifier.weight(1f))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clickable(onClick = onOpenSchedule)
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+            ) {
+                Text(
+                    "全部赛程",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = scheme.primary,
+                )
+                Icon(
+                    Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = "进入全部赛程",
+                    tint = scheme.primary,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+        if (matches.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            matches.forEachIndexed { index, match ->
+                if (index > 0) Spacer(Modifier.height(12.dp))
+                MatchCard(item = match, onClick = { onOpenMatch(match.id) })
             }
         }
     }

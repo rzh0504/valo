@@ -146,6 +146,7 @@ private fun AppRoot(deepLink: DeepLinkState) {
                         )
                     )
                 },
+                onOpenMatch = openMatch,
             )
         }
         entry<Route.TeamSchedule> { route ->
