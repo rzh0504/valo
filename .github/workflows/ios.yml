@@ -1,12 +1,13 @@
-# iOS 未签名构建的手动触发入口：修 iOS CI 或给已发布 Release 补产物时单独跑，
-# 不连带动 Android。发版（tag 推送）走 release.yml，会并行构建 Android + iOS。
-name: iOS Build
+# iOS 模拟器包的手动触发构建（Appetize 等云模拟器用），不连带动其他构建。
+# 发版（tag 推送）走 release.yml，出 Android APK + iOS 未签名 IPA；
+# 发版 IPA 缺失或失败时重跑 Release 工作流里失败的 ios job 即可。
+name: iOS Simulator Build
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "要附加产物的 Release tag（如 v1.0.6，留空只传 Artifact）"
+        description: "要附加产物的 Release tag（如 v1.0.7，留空只传 Artifact）"
         required: false
         default: ""
 
@@ -14,7 +15,7 @@ permissions:
   contents: write
 
 jobs:
-  ios:
+  ios-simulator:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
@@ -26,25 +27,11 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # 工程无共享 scheme，用 -target 构建；-derivedDataPath 与 -target 不兼容，
-      # 改传 SYMROOT 指定产物目录；关闭签名，用户经 Sideloadly / AltStore /
-      # TrollStore 自签安装
-      - name: 构建 iOS App（未签名）
-        run: |
-          chmod +x gradlew
-          xcodebuild \
-            -project iosApp/iosApp.xcodeproj \
-            -target iosApp \
-            -configuration Release \
-            -sdk iphoneos \
-            SYMROOT="$PWD/build/ios-products" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY= \
-            build
-
       # 只构建 arm64：工程未注册 iosX64，Compose 的资源同步任务遇到 x86_64 会
-      # 报 "Unknown iOS simulator arch"；Appetize 官方也推荐 ARM 模拟器构建
-      - name: 构建 iOS 模拟器版（Appetize 等云模拟器用）
+      # 报 "Unknown iOS simulator arch"；Appetize 官方也推荐 ARM 模拟器构建。
+      # 工程无共享 scheme，用 -target 构建；-derivedDataPath 与 -target 不兼容，
+      # 改传 SYMROOT 指定产物目录；关闭签名，由云模拟器直接运行
+      - name: 构建 iOS 模拟器版（未签名）
         run: |
           xcodebuild \
             -project iosApp/iosApp.xcodeproj \
@@ -57,46 +44,33 @@ jobs:
             CODE_SIGN_IDENTITY= \
             build
 
+      # 模拟器包：.app 置于 zip 根目录（Appetize 要求，macOS 打包保留执行权限位）
       - name: 打包产物
         run: |
-          APP_PATH=$(find build/ios-products -type d -name "*.app" | head -n 1)
-          if [ -z "$APP_PATH" ]; then
-            echo "::error::未找到 .app 构建产物"
-            exit 1
-          fi
           SIM_APP=$(find build/ios-sim -type d -name "*.app" | head -n 1)
           if [ -z "$SIM_APP" ]; then
             echo "::error::未找到模拟器 .app 构建产物"
             exit 1
           fi
-          rm -rf Payload
-          mkdir Payload
-          cp -R "$APP_PATH" Payload/
           RELEASE_TAG="${{ github.event.inputs.tag }}"
           if [ -z "$RELEASE_TAG" ]; then
             RELEASE_TAG="${GITHUB_REF_NAME}"
           fi
-          zip -qr "valo-${RELEASE_TAG}-ios-unsigned.ipa" Payload
           cd "$(dirname "$SIM_APP")"
           zip -qr "$GITHUB_WORKSPACE/valo-${RELEASE_TAG}-ios-simulator.zip" "$(basename "$SIM_APP")"
-          echo "IPA_NAME=valo-${RELEASE_TAG}-ios-unsigned.ipa" >> "$GITHUB_ENV"
           echo "SIM_ZIP=valo-${RELEASE_TAG}-ios-simulator.zip" >> "$GITHUB_ENV"
           echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
 
-      # 手动触发的 Artifact 会再包一层 zip，解压后即是可用的 ipa / 模拟器包
+      # 手动触发的 Artifact 会再包一层 zip，解压后即是可用的模拟器包
       - name: 上传构建产物（Artifact）
         uses: actions/upload-artifact@v4
         with:
-          name: valo-ios
-          path: |
-            ${{ env.IPA_NAME }}
-            ${{ env.SIM_ZIP }}
+          name: valo-ios-simulator
+          path: ${{ env.SIM_ZIP }}
 
       - name: 附加到 GitHub Release
         if: github.event.inputs.tag != ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          files: |
-            ${{ env.IPA_NAME }}
-            ${{ env.SIM_ZIP }}
+          files: ${{ env.SIM_ZIP }}

@@ -62,8 +62,9 @@ jobs:
         with:
           files: valo-${{ github.ref_name }}.apk
 
-  # 未签名 IPA + 模拟器构建：工程无共享 scheme，用 -target 构建；
-  # -derivedDataPath 与 -target 不兼容，改传 SYMROOT 指定产物目录
+  # 未签名 IPA：工程无共享 scheme，用 -target 构建；
+  # -derivedDataPath 与 -target 不兼容，改传 SYMROOT 指定产物目录。
+  # 模拟器包不随发版构建，需要时手动触发 ios.yml 单独出
   ios:
     needs: create-release
     runs-on: macos-15
@@ -90,23 +91,7 @@ jobs:
             CODE_SIGN_IDENTITY= \
             build
 
-      # 只构建 arm64：工程未注册 iosX64，Compose 的资源同步任务遇到 x86_64 会
-      # 报 "Unknown iOS simulator arch"；Appetize 官方也推荐 ARM 模拟器构建
-      - name: 构建 iOS 模拟器版（Appetize 等云模拟器用）
-        run: |
-          xcodebuild \
-            -project iosApp/iosApp.xcodeproj \
-            -target iosApp \
-            -configuration Release \
-            -sdk iphonesimulator \
-            ARCHS=arm64 \
-            SYMROOT="$PWD/build/ios-sim" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY= \
-            build
-
-      # IPA：Payload/<App>.app 结构，供真机自签；模拟器包：.app 置于 zip 根目录
-      # （Appetize 要求，macOS 打包保留执行权限位），供云模拟器直接上传
+      # IPA：Payload/<App>.app 结构，供真机自签
       - name: 打包产物
         run: |
           APP_PATH=$(find build/ios-products -type d -name "*.app" | head -n 1)
@@ -114,21 +99,12 @@ jobs:
             echo "::error::未找到 .app 构建产物"
             exit 1
           fi
-          SIM_APP=$(find build/ios-sim -type d -name "*.app" | head -n 1)
-          if [ -z "$SIM_APP" ]; then
-            echo "::error::未找到模拟器 .app 构建产物"
-            exit 1
-          fi
           rm -rf Payload
           mkdir Payload
           cp -R "$APP_PATH" Payload/
           zip -qr "valo-${GITHUB_REF_NAME}-ios-unsigned.ipa" Payload
-          cd "$(dirname "$SIM_APP")"
-          zip -qr "$GITHUB_WORKSPACE/valo-${GITHUB_REF_NAME}-ios-simulator.zip" "$(basename "$SIM_APP")"
 
       - name: 上传到 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            valo-${{ github.ref_name }}-ios-unsigned.ipa
-            valo-${{ github.ref_name }}-ios-simulator.zip
+          files: valo-${{ github.ref_name }}-ios-unsigned.ipa
