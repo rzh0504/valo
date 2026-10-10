@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rzh.valo.data.AppContainer
 import com.rzh.valo.data.MATCH_LEVELS
+import com.rzh.valo.data.NavBarStyle
 import com.rzh.valo.data.SettingsStore
 import com.rzh.valo.data.ThemeMode
 import com.rzh.valo.data.UpdateChecker
@@ -41,6 +42,9 @@ class SettingsViewModel(
     val matchLevels: StateFlow<Set<String>> =
         container.settingsStore.matchLevels.stateIn(viewModelScope, SharingStarted.Eagerly, MATCH_LEVELS.toSet())
 
+    val navigationBarStyle: StateFlow<NavBarStyle> =
+        container.settingsStore.navigationBarStyle.stateIn(viewModelScope, SharingStarted.Eagerly, NavBarStyle.DEFAULT)
+
     private val _updateCheck = MutableStateFlow<UpdateCheck>(UpdateCheck.Idle)
     val updateCheck: StateFlow<UpdateCheck> = _updateCheck.asStateFlow()
 
@@ -48,6 +52,12 @@ class SettingsViewModel(
         viewModelScope.launch {
             container.settingsStore.setThemeMode(mode)
             onWidgetDataChanged?.invoke()
+        }
+    }
+
+    fun setNavigationBarStyle(style: NavBarStyle) {
+        viewModelScope.launch {
+            container.settingsStore.setNavigationBarStyle(style)
         }
     }
 

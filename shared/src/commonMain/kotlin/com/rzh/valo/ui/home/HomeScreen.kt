@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.data.MatchStatus
@@ -45,7 +46,11 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
 @Composable
-fun HomeScreen(onOpenMatch: (String) -> Unit) {
+fun HomeScreen(
+    onOpenMatch: (String) -> Unit,
+    // 悬浮底栏高度：让列表末项能滚出栏顶（默认样式为 0，由外层 pager 垫高）
+    extraBottomPadding: Dp = 0.dp,
+) {
     val container = LocalAppContainer.current
     val viewModel: HomeViewModel = viewModel(key = "home") {
         HomeViewModel(container.repository, container.settingsStore)
@@ -85,7 +90,7 @@ fun HomeScreen(onOpenMatch: (String) -> Unit) {
                     modifier = Modifier.fillMaxSize(),
                     topAppBarScrollBehavior = scrollBehavior,
                 ) {
-                    HomeContent(state, viewModel, onOpenMatch)
+                    HomeContent(state, viewModel, onOpenMatch, extraBottomPadding)
                 }
             }
         }
@@ -93,9 +98,14 @@ fun HomeScreen(onOpenMatch: (String) -> Unit) {
 }
 
 @Composable
-private fun HomeContent(state: HomeUiState, viewModel: HomeViewModel, onOpenMatch: (String) -> Unit) {
+private fun HomeContent(
+    state: HomeUiState,
+    viewModel: HomeViewModel,
+    onOpenMatch: (String) -> Unit,
+    extraBottomPadding: Dp,
+) {
     LazyColumn(
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp + extraBottomPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
             .fillMaxSize()

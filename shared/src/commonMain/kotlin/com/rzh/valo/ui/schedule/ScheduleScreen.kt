@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.ui.LocalAppContainer
@@ -65,7 +66,11 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
 @Composable
-fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
+fun ScheduleScreen(
+    onOpenMatch: (String) -> Unit,
+    // 悬浮底栏高度：让列表末项能滚出栏顶（默认样式为 0，由外层 pager 垫高）
+    extraBottomPadding: Dp = 0.dp,
+) {
     val container = LocalAppContainer.current
     val viewModel: ScheduleViewModel = viewModel(key = "schedule") {
         ScheduleViewModel(container.repository, container.settingsStore)
@@ -131,13 +136,16 @@ fun ScheduleScreen(onOpenMatch: (String) -> Unit) {
                     modifier = Modifier.fillMaxSize(),
                     topAppBarScrollBehavior = scrollBehavior,
                 ) {
-                    ScheduleList(state, listState, onOpenMatch)
+                    ScheduleList(state, listState, onOpenMatch, extraBottomPadding)
                 }
             }
             TodayFab(
                 state = state,
                 listState = listState,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
+                // 悬浮样式时抬到底栏上方（默认样式 extraBottomPadding 为 0）
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(start = 20.dp, end = 20.dp, bottom = 20.dp + extraBottomPadding),
             )
 
             // miuix 弹层依赖根 Scaffold 注册，必须位于 Scaffold content 子树内
@@ -168,10 +176,11 @@ private fun ScheduleList(
     state: ScheduleUiState,
     listState: LazyListState,
     onOpenMatch: (String) -> Unit,
+    extraBottomPadding: Dp,
 ) {
     LazyColumn(
         state = listState,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp + extraBottomPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
             .fillMaxSize()

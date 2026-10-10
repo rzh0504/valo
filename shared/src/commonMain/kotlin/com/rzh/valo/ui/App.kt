@@ -16,11 +16,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.rzh.valo.data.AppContainer
+import com.rzh.valo.data.NavBarStyle
 import com.rzh.valo.data.Participant
 import com.rzh.valo.data.ThemeMode
 import com.rzh.valo.ui.detail.MatchDetailScreen
@@ -185,6 +187,8 @@ private fun MainTabs(
     // 页间也支持横滑；各页 rememberSaveable 状态由 pager 内置的 holder 保管
     val pagerState = rememberPagerState(pageCount = { 3 })
     val scope = rememberCoroutineScope()
+    val navBarStyle by LocalAppContainer.current.settingsStore.navigationBarStyle
+        .collectAsStateWithLifecycle(NavBarStyle.DEFAULT)
 
     Scaffold(
         bottomBar = {
@@ -192,24 +196,34 @@ private fun MainTabs(
                 // targetPage 在点击动画开始时即指向目标页、手势翻页过半后跟随，高亮始终领先于落位
                 currentIndex = pagerState.targetPage,
                 onSelect = { index -> scope.launch { pagerState.springAnimateToPage(index) } },
+                style = navBarStyle,
+                pagerState = pagerState,
             )
         },
     ) { padding ->
+        // 默认样式：整宽不透明栏，内容止于栏上方；悬浮样式：内容从栏下方穿过，
+        // 栏高改为各页列表的底部留白，末项可滚出栏顶
+        val floating = navBarStyle == NavBarStyle.FLOATING
+        val barHeight = padding.calculateBottomPadding()
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (floating) Modifier else Modifier.padding(bottom = barHeight)),
             flingBehavior = PagerDefaults.flingBehavior(
                 state = pagerState,
                 snapAnimationSpec = PagerNavigationSpringSpec,
             ),
             verticalAlignment = Alignment.Top,
         ) { page ->
+            val extraBottom = if (floating) barHeight else 0.dp
             when (page) {
-                0 -> HomeScreen(onOpenMatch = onOpenMatch)
-                1 -> ScheduleScreen(onOpenMatch = onOpenMatch)
+                0 -> HomeScreen(onOpenMatch = onOpenMatch, extraBottomPadding = extraBottom)
+                1 -> ScheduleScreen(onOpenMatch = onOpenMatch, extraBottomPadding = extraBottom)
                 else -> SettingsScreen(
                     onOpenScheduleFilter = onOpenScheduleFilter,
                     onOpenAbout = onOpenAbout,
+                    extraBottomPadding = extraBottom,
                 )
             }
         }

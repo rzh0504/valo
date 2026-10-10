@@ -23,6 +23,16 @@ enum class ThemeMode(val id: Int, val label: String) {
     }
 }
 
+/** 底部导航栏样式 */
+enum class NavBarStyle(val id: Int, val label: String) {
+    DEFAULT(0, "默认"),
+    FLOATING(1, "悬浮");
+
+    companion object {
+        fun from(id: Int): NavBarStyle = entries.firstOrNull { it.id == id } ?: DEFAULT
+    }
+}
+
 val MATCH_LEVELS = listOf("S", "A", "B", "C")
 
 /** 按用户勾选的赛事级别过滤；接口未标注级别（或级别不在已知集合内）的比赛始终保留 */
@@ -36,9 +46,14 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
 
     private val themeKey = intPreferencesKey("theme_mode")
     private val matchLevelsKey = stringSetPreferencesKey("match_levels")
+    private val navBarStyleKey = intPreferencesKey("nav_bar_style")
 
     val themeMode: Flow<ThemeMode> = dataStore.data.map {
         ThemeMode.from(it[themeKey] ?: ThemeMode.SYSTEM.id)
+    }
+
+    val navigationBarStyle: Flow<NavBarStyle> = dataStore.data.map {
+        NavBarStyle.from(it[navBarStyleKey] ?: NavBarStyle.DEFAULT.id)
     }
 
     /** 赛程中保留的赛事级别；接口未提供级别的比赛始终保留。 */
@@ -48,6 +63,10 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setThemeMode(mode: ThemeMode) {
         dataStore.edit { it[themeKey] = mode.id }
+    }
+
+    suspend fun setNavigationBarStyle(style: NavBarStyle) {
+        dataStore.edit { it[navBarStyleKey] = style.id }
     }
 
     suspend fun setMatchLevel(level: String, enabled: Boolean) {
