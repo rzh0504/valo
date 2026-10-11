@@ -252,6 +252,120 @@ data class GameMap(
     @SerialName("map_status") val status: Int = 0,
 )
 
+// ---------- 赛事列表（tournament/list） ----------
+
+/** 赛事列表请求（服务端单页上限 500，仓库层按页补齐） */
+@Serializable
+data class TournamentListRequest(
+    @SerialName("game_id") val gameId: String,
+    val page: Int,
+    @SerialName("page_size") val pageSize: Int,
+    /** 可选，按系列赛过滤（页面全量拉取后客户端过滤，不传） */
+    @SerialName("series_id") val seriesId: String? = null,
+    @SerialName("start_time_sort") val startTimeSort: String? = null,
+)
+
+@Serializable
+data class TournamentListData(val count: Int = 0, val list: List<TournamentItem> = emptyList())
+
+/** 赛事卡片（tournament/list 元素）。展示名按网页 name_full 规则拼接，见 [displayName] */
+@Serializable
+data class TournamentItem(
+    @SerialName("tournament_id") val id: String = "",
+    val name: String? = null,
+    val icon: String? = null,
+    @SerialName("start_date") val startDate: Long = 0L,
+    @SerialName("end_date") val endDate: Long = 0L,
+    @SerialName("series_info") val series: TournamentSeriesInfo? = null,
+    @SerialName("second_series_info") val secondSeries: TournamentSeriesInfo? = null,
+    @SerialName("tournament_group_info") val group: GroupInfo? = null,
+    /** 1 未开始 · 2 进行中 · 3 已结束（实测与比赛状态同语义） */
+    @SerialName("tournament_status") val status: Int = 0,
+    @SerialName("champion_info") val champion: TournamentChampion? = null,
+    val level: String? = null,
+    @SerialName("total_bonus") val totalBonus: String? = null,
+    @SerialName("zone_name") val zoneName: String? = null,
+    /** 补充文本（如主办城市「上海」/子站「挑战者1」，常带尾随空格） */
+    @SerialName("supple_text") val suppleText: String? = null,
+) {
+    val isLive: Boolean get() = status == MatchStatus.LIVE
+    val isFinished: Boolean get() = status == MatchStatus.FINISHED
+
+    /**
+     * 完整展示名，对齐号角网页 app.js 的 name_full：
+     * "{主系列英文缩写} {年份}: {supple_text}{分组名}"（主系列 = series_info 优先、second_series_info 兜底；
+     * supple 直接前置拼接，其数据常自带尾随空格）。整串为空时退回子系列/系列/年份名。
+     */
+    val displayName: String
+        get() {
+            val primarySeries = series ?: secondSeries
+            val prefix = primarySeries?.nameEnSub?.takeIf { it.isNotBlank() }.orEmpty()
+            val year = name?.takeIf { it.isNotBlank() }.orEmpty()
+            val supple = suppleText.orEmpty()
+            val group = group?.nameMain?.takeIf { it.isNotBlank() }.orEmpty()
+            return "$prefix $year: $supple$group".trim().ifBlank {
+                secondSeries?.name?.takeIf { it.isNotBlank() }
+                    ?: series?.name?.takeIf { it.isNotBlank() }
+                    ?: name.orEmpty()
+            }
+        }
+}
+
+/** 赛事所属系列（冠军巡回赛 / 挑战者联赛等；second_series 为子系列） */
+@Serializable
+data class TournamentSeriesInfo(
+    @SerialName("series_id") val id: String = "",
+    @SerialName("series_name") val name: String? = null,
+    @SerialName("series_name_en_sub") val nameEnSub: String? = null,
+    @SerialName("series_icon") val icon: String? = null,
+)
+
+/** 赛事冠军（champion_info，participant 同构但字段名不同） */
+@Serializable
+data class TournamentChampion(
+    val id: String = "",
+    val name: String? = null,
+    @SerialName("name_short") val nameShort: String? = null,
+    val icon: String? = null,
+) {
+    val displayName: String get() = nameShort?.takeIf { it.isNotBlank() } ?: name.orEmpty()
+}
+
+/** 赛事页赛区筛选的大区桶（对齐号角网页 tour 页的 5 个赛区选项） */
+object TournamentZones {
+    const val ALL = "all"
+    const val GLOBAL = "global"
+    const val CHINA = "china"
+    const val PACIFIC = "pacific"
+    const val EMEA = "emea"
+    const val AMERICAS = "americas"
+}
+
+/**
+ * zone_name → 大区桶。2026-10-11 实测校准：zone/list 官方树里「中国港台」属 Pacific、
+ * 美洲桶只有 北美/南美/巴西/拉丁美洲，且树外的别名（EMEA赛区、CN赛区、拉美北/南等）
+ * 需按关键词归类；新出现的未知赛区返回 null（仅「全部」可见）。
+ */
+fun tournamentZoneBucket(zoneName: String?): String? {
+    if (zoneName == null) return null
+    return when {
+        "全球" in zoneName || "Global" in zoneName -> TournamentZones.GLOBAL
+        "港台" in zoneName -> TournamentZones.PACIFIC
+        "中国" in zoneName || zoneName.startsWith("CN") -> TournamentZones.CHINA
+        "美洲" in zoneName || "拉美" in zoneName || "北美" in zoneName ||
+            "南美" in zoneName || "巴西" in zoneName -> TournamentZones.AMERICAS
+        "EMEA" in zoneName || "欧" in zoneName || "中东" in zoneName || "北非" in zoneName ||
+            "非洲" in zoneName || "土耳其" in zoneName || "独联体" in zoneName ||
+            "海湾" in zoneName || "德语" in zoneName || "西班牙" in zoneName ||
+            "法国" in zoneName || "葡萄牙" in zoneName || "意大利" in zoneName -> TournamentZones.EMEA
+        "太平洋" in zoneName || "日本" in zoneName || "韩国" in zoneName || "东南亚" in zoneName ||
+            "印尼" in zoneName || "马来" in zoneName || "新加坡" in zoneName || "泰国" in zoneName ||
+            "越南" in zoneName || "菲律宾" in zoneName || "南亚" in zoneName ||
+            "大洋洲" in zoneName || "亚太" in zoneName -> TournamentZones.PACIFIC
+        else -> null
+    }
+}
+
 // ---------- 赛事（stage_with_group / integral_table） ----------
 
 /** 赛事阶段（stage_id 供积分表、对阵图使用） */

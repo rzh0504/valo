@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import kotlinx.coroutines.flow.Flow
@@ -41,12 +42,25 @@ fun List<MatchItem>.filterByLevels(enabled: Set<String>): List<MatchItem> = filt
     level !in MATCH_LEVELS || level in enabled
 }
 
+/** 赛事页持久化的筛选状态（「保存筛选」开关开启时写入/恢复） */
+data class TournamentSavedFilters(
+    val zone: String = TournamentZones.ALL,
+    val level: String? = null,
+    val year: Int? = null,
+    val status: Int = 0,
+)
+
 /** 应用设置（DataStore 持久化，文件与应用内目录沿用以兼容旧版升级） */
 class SettingsStore(private val dataStore: DataStore<Preferences>) {
 
     private val themeKey = intPreferencesKey("theme_mode")
     private val matchLevelsKey = stringSetPreferencesKey("match_levels")
     private val navBarStyleKey = intPreferencesKey("nav_bar_style")
+    private val tournamentSaveFiltersKey = booleanPreferencesKey("tournament_save_filters")
+    private val tournamentZoneKey = stringPreferencesKey("tournament_zone")
+    private val tournamentLevelKey = stringPreferencesKey("tournament_level")
+    private val tournamentYearKey = intPreferencesKey("tournament_year")
+    private val tournamentStatusKey = intPreferencesKey("tournament_status")
 
     val themeMode: Flow<ThemeMode> = dataStore.data.map {
         ThemeMode.from(it[themeKey] ?: ThemeMode.SYSTEM.id)
@@ -61,12 +75,40 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         (it[matchLevelsKey] ?: MATCH_LEVELS.toSet()).intersect(MATCH_LEVELS.toSet())
     }
 
+    /** 赛事页「保存筛选」开关（默认关闭，关闭时不读写筛选值） */
+    val tournamentFiltersSaved: Flow<Boolean> = dataStore.data.map {
+        it[tournamentSaveFiltersKey] ?: false
+    }
+
+    /** 赛事页筛选值的持久化快照 */
+    val tournamentFilters: Flow<TournamentSavedFilters> = dataStore.data.map {
+        TournamentSavedFilters(
+            zone = it[tournamentZoneKey] ?: TournamentZones.ALL,
+            level = it[tournamentLevelKey]?.takeIf { level -> level.isNotBlank() },
+            year = it[tournamentYearKey]?.takeIf { year -> year != 0 },
+            status = it[tournamentStatusKey] ?: 0,
+        )
+    }
+
     suspend fun setThemeMode(mode: ThemeMode) {
         dataStore.edit { it[themeKey] = mode.id }
     }
 
     suspend fun setNavigationBarStyle(style: NavBarStyle) {
         dataStore.edit { it[navBarStyleKey] = style.id }
+    }
+
+    suspend fun setTournamentFiltersSaved(enabled: Boolean) {
+        dataStore.edit { it[tournamentSaveFiltersKey] = enabled }
+    }
+
+    suspend fun setTournamentFilters(filters: TournamentSavedFilters) {
+        dataStore.edit {
+            it[tournamentZoneKey] = filters.zone
+            it[tournamentLevelKey] = filters.level.orEmpty()
+            it[tournamentYearKey] = filters.year ?: 0
+            it[tournamentStatusKey] = filters.status
+        }
     }
 
     suspend fun setMatchLevel(level: String, enabled: Boolean) {

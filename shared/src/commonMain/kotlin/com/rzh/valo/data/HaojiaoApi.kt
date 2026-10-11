@@ -81,6 +81,10 @@ class HaojiaoApi {
     suspend fun valorantMaps(): List<GameMap> =
         exec(get("$BASE/wiki/api/v1/game/valorant_map") { })
 
+    /** 赛事列表（POST，明文；服务端单页上限 500，全量拉取由仓库层按页补齐） */
+    suspend fun tournamentList(request: TournamentListRequest): TournamentListData =
+        exec(jsonRequest(HttpMethod.Post, "$BASE/wiki/api/v1/tournament/list", json.encodeToString(request)))
+
     /** 赛事阶段与分组（stage_id 供积分表使用） */
     suspend fun tournamentStages(tournamentId: String): List<TournamentStage> =
         exec(

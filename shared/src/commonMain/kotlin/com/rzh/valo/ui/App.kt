@@ -34,6 +34,7 @@ import com.rzh.valo.ui.settings.SettingsScreen
 import com.rzh.valo.ui.team.TeamDetailScreen
 import com.rzh.valo.ui.team.TeamScheduleScreen
 import com.rzh.valo.ui.theme.ValoTheme
+import com.rzh.valo.ui.tournament.TournamentListScreen
 import com.rzh.valo.ui.tournament.TournamentScreen
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.NavigationBar
@@ -185,7 +186,7 @@ private fun MainTabs(
 ) {
     // 页签即 pager 页：点底部栏弹簧滑动到目标页（miuix example 惯用形态），
     // 页间也支持横滑；各页 rememberSaveable 状态由 pager 内置的 holder 保管
-    val pagerState = rememberPagerState(pageCount = { 3 })
+    val pagerState = rememberPagerState(pageCount = { 4 })
     val scope = rememberCoroutineScope()
     val navBarStyle by LocalAppContainer.current.settingsStore.navigationBarStyle
         .collectAsStateWithLifecycle(NavBarStyle.DEFAULT)
@@ -220,7 +221,7 @@ private fun MainTabs(
             when (page) {
                 0 -> HomeScreen(onOpenMatch = onOpenMatch, extraBottomPadding = extraBottom)
                 1 -> ScheduleScreen(onOpenMatch = onOpenMatch, extraBottomPadding = extraBottom)
-                else -> SettingsScreen(
+                2 -> TournamentListScreen(onOpenTournament = onOpenTournament, extraBottomPadding = extraBottom)                else -> SettingsScreen(
                     onOpenScheduleFilter = onOpenScheduleFilter,
                     onOpenAbout = onOpenAbout,
                     extraBottomPadding = extraBottom,

@@ -75,6 +75,7 @@ class MatchRepository(
     private val teamRewardCache = TtlCache<String, List<TeamReward>>(HALF_DAY_TTL)
     private val stageCache = TtlCache<String, List<TournamentStage>>(WINDOW_TTL)
     private val integralCache = TtlCache<Pair<String, String>, List<IntegralGroup>>(WINDOW_TTL)
+    private val tournamentListCache = TtlCache<Unit, List<TournamentItem>>(WINDOW_TTL)
 
     /**
      * 拉取 [startTime, endTime) 时间窗内的比赛（升序）。
@@ -173,6 +174,12 @@ class MatchRepository(
             teamRewardCache.get(teamId, force) { api.teamReward(teamId) }
         }
 
+    /** 全部赛事（tournament/list，开始时间升序全量拉取），单份缓存 [WINDOW_TTL]。 */
+    suspend fun tournamentList(force: Boolean = false): List<TournamentItem> =
+        withContext(Dispatchers.Default) {
+            tournamentListCache.get(Unit, force) { fetchTournaments() }
+        }
+
     /** 赛事阶段与分组，单赛事缓存 [WINDOW_TTL]。 */
     suspend fun tournamentStages(tournamentId: String, force: Boolean = false): List<TournamentStage> =
         withContext(Dispatchers.Default) {
@@ -244,6 +251,28 @@ class MatchRepository(
         return (now - 36 * HOUR) to (now + 7 * DAY)
     }
 
+    /** 实测服务端单页上限 500（page_size 传 999 也只返回 500 条），按页补齐全量 */
+    private suspend fun fetchTournaments(): List<TournamentItem> {
+        val all = ArrayList<TournamentItem>()
+        var page = 1
+        var count = Int.MAX_VALUE
+        while (page <= MAX_PAGES && all.size < count) {
+            val data = api.tournamentList(
+                TournamentListRequest(
+                    gameId = HaojiaoApi.GAME_ID,
+                    page = page,
+                    pageSize = TOURNAMENT_PAGE_SIZE,
+                    startTimeSort = "asc",
+                )
+            )
+            count = data.count
+            all += data.list
+            if (data.list.isEmpty()) break
+            page++
+        }
+        return all.distinctBy { it.id }
+    }
+
     private suspend fun fetchTournamentPages(tournamentId: String): List<MatchItem> {
         val all = ArrayList<MatchItem>()
         var page = 1
@@ -313,6 +342,7 @@ class MatchRepository(
         // internal：页面层的翻页结束判断（不足一页即最后一页）与它保持一致
         internal const val PAGE_SIZE = 100
         private const val MAX_PAGES = 3
+        private const val TOURNAMENT_PAGE_SIZE = 500
         private const val SORT_ASC = 1
         /** 倒序（2026-09-27 实测：第 1 页返回最新比赛） */
         private const val SORT_DESC = 2

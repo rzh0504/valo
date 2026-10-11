@@ -20,9 +20,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Today
 import androidx.compose.runtime.Composable
@@ -66,10 +68,11 @@ private data class TabSpec(
 private val TABS = listOf(
     TabSpec("今天", Icons.Outlined.Today, Icons.Rounded.Today),
     TabSpec("赛程", Icons.Outlined.CalendarMonth, Icons.Rounded.CalendarMonth),
+    TabSpec("赛事", Icons.Outlined.EmojiEvents, Icons.Rounded.EmojiEvents),
     TabSpec("设置", Icons.Outlined.Settings, Icons.Rounded.Settings),
 )
 
-/** 底部页签（今天 / 赛程 / 设置） */
+/** 底部页签（今天 / 赛程 / 赛事 / 设置） */
 @Composable
 internal fun MainNavigationBar(
     currentIndex: Int,
