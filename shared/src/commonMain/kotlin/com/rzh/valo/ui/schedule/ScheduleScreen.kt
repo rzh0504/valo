@@ -204,7 +204,6 @@ private fun ScheduleList(
                 MatchCard(
                     item = match,
                     onClick = { onOpenMatch(match.id) },
-                    modifier = Modifier.animateItem(),
                 )
             }
         }

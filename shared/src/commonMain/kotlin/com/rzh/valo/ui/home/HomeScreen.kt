@@ -163,7 +163,6 @@ private fun androidx.compose.foundation.lazy.LazyListScope.section(
             item = match,
             onClick = { onOpenMatch(match.id) },
             showCountdown = true,
-            modifier = Modifier.animateItem(),
         )
     }
 }

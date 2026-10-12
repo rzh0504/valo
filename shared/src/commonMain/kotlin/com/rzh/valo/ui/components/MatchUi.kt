@@ -124,18 +124,11 @@ fun StatusPill(status: Int, modifier: Modifier = Modifier) {
 
 @Composable
 fun LiveDot(color: Color = MiuixTheme.colorScheme.primary) {
-    val transition = rememberInfiniteTransition(label = "live")
-    val alpha by transition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0.25f,
-        animationSpec = infiniteRepeatable(tween(750), RepeatMode.Reverse),
-        label = "liveAlpha",
-    )
+    // A static marker avoids one frame-clock animation per live card on the home list.
     Box(
         Modifier
             .padding(end = 6.dp)
             .size(7.dp)
-            .alpha(alpha)
             .clip(CircleShape)
             .background(color),
     )
