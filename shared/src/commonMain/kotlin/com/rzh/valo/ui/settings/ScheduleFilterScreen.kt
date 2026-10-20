@@ -17,6 +17,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.data.SERIES_CATALOG
 import com.rzh.valo.ui.LocalAppContainer
 import com.rzh.valo.ui.LocalWidgetRefresher
+import com.rzh.valo.ui.components.TeamLogo
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -68,6 +69,7 @@ fun ScheduleFilterScreen(onBack: () -> Unit) {
                     SERIES_CATALOG.forEach { series ->
                         CheckboxPreference(
                             title = series.label,
+                            startAction = { TeamLogo(series.icon, size = 36) },
                             checked = series.id !in hiddenSeries,
                             onCheckedChange = { viewModel.setSeriesShown(series.id, it) },
                             checkboxLocation = CheckboxLocation.End,

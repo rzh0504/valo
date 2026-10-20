@@ -57,6 +57,11 @@ class SeriesMapTest {
     }
 
     @Test
+    fun `目录条目均带徽标`() {
+        assertTrue(SERIES_CATALOG.all { !it.icon.isNullOrBlank() })
+    }
+
+    @Test
     fun `标签拼接子系列缩写`() {
         assertEquals("冠军巡回赛 VCT", SeriesSummary("s-vct", "冠军巡回赛", "VCT").label)
         assertEquals("冠军巡回赛", SeriesSummary("s-vct", "冠军巡回赛", null).label)
