@@ -14,7 +14,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.rzh.valo.data.MATCH_LEVELS
+import com.rzh.valo.data.SERIES_CATALOG
 import com.rzh.valo.ui.LocalAppContainer
 import com.rzh.valo.ui.LocalWidgetRefresher
 import top.yukonga.miuix.kmp.basic.Card
@@ -30,24 +30,15 @@ import top.yukonga.miuix.kmp.preference.CheckboxPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
-/** 各赛事级别的描述文案 */
-private val LEVEL_SUMMARIES = mapOf(
-    "S" to "各赛区一级联赛、全球赛事",
-    "A" to "各赛区进化者杯、EWC、邀请赛等",
-    "B" to "改变者、全国大赛等",
-    "C" to "ENC、赛区预选赛等",
-)
-
-/** 赛程过滤独立设置页：按赛事级别勾选赛程中显示的比赛 */
+/** 赛程过滤独立设置页：按系列赛勾选屏蔽，目录写死、热门系列默认显示 */
 @Composable
 fun ScheduleFilterScreen(onBack: () -> Unit) {
     val container = LocalAppContainer.current
     val widgetRefresher = LocalWidgetRefresher.current
-    // 与设置页共用同名 ViewModel，保证两处读到同一份级别状态
-    val viewModel: SettingsViewModel = viewModel(key = "settings") {
-        SettingsViewModel(container, widgetRefresher)
+    val viewModel: ScheduleFilterViewModel = viewModel(key = "schedule_filter") {
+        ScheduleFilterViewModel(container, widgetRefresher)
     }
-    val matchLevels by viewModel.matchLevels.collectAsStateWithLifecycle()
+    val hiddenSeries by viewModel.hiddenSeries.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
 
     Scaffold(
@@ -71,21 +62,20 @@ fun ScheduleFilterScreen(onBack: () -> Unit) {
                 .overScrollVertical()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
         ) {
-            item(key = "levels") {
-                SmallTitle(text = "赛事级别")
+            item(key = "series") {
+                SmallTitle(text = "系列赛")
                 Card(modifier = Modifier.padding(horizontal = 12.dp)) {
-                    MATCH_LEVELS.forEach { level ->
+                    SERIES_CATALOG.forEach { series ->
                         CheckboxPreference(
-                            title = level,
-                            summary = LEVEL_SUMMARIES[level],
-                            checked = level in matchLevels,
-                            onCheckedChange = { viewModel.setMatchLevel(level, it) },
+                            title = series.label,
+                            checked = series.id !in hiddenSeries,
+                            onCheckedChange = { viewModel.setSeriesShown(series.id, it) },
                             checkboxLocation = CheckboxLocation.End,
                         )
                     }
                 }
                 Text(
-                    "未标注级别的比赛始终显示",
+                    "热门系列默认显示，取消勾选可屏蔽整个系列（如改变者赛）；未收录系列的比赛始终显示",
                     style = MiuixTheme.textStyles.footnote2,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),

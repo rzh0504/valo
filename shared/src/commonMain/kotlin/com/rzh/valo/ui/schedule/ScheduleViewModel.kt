@@ -3,11 +3,10 @@ package com.rzh.valo.ui.schedule
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rzh.valo.data.MatchItem
-import com.rzh.valo.data.MATCH_LEVELS
 import com.rzh.valo.data.MatchRepository
 import com.rzh.valo.data.SettingsStore
 import com.rzh.valo.data.epochToLocalDate
-import com.rzh.valo.data.filterByLevels
+import com.rzh.valo.data.filterBySeries
 import com.rzh.valo.data.formatCnDate
 import com.rzh.valo.data.nowMillis
 import com.rzh.valo.data.plusDays
@@ -80,18 +79,20 @@ class ScheduleViewModel(
     val state = _state.asStateFlow()
 
     private var items: List<MatchItem> = emptyList()
-    private var matchLevels: Set<String> = MATCH_LEVELS.toSet()
+    private var hiddenSeries: Set<String> = emptySet()
+    private var seriesMap: Map<String, String> = emptyMap()
     private var loadJob: Job? = null
     /** 上次发起联网加载的时间，作为回前台是否再验证的依据 */
     private var lastRequestedAt = 0L
 
     init {
         viewModelScope.launch {
-            settingsStore.matchLevels.collectLatest {
-                matchLevels = it
+            settingsStore.scheduleHiddenSeries.collectLatest {
+                hiddenSeries = it
                 recompute()
             }
         }
+        fetchSeriesMap()
         loadCached()
     }
 
@@ -133,6 +134,7 @@ class ScheduleViewModel(
     private fun loadInternal(force: Boolean) {
         lastRequestedAt = nowMillis()
         loadJob?.cancel()
+        fetchSeriesMap()
         val requestedOffset = _state.value.weekOffset
         val requestedCustomStart = _state.value.customStart
         val requestedCustomEnd = _state.value.customEnd
@@ -191,11 +193,11 @@ class ScheduleViewModel(
 
     private fun recompute() {
         val today = todayCn()
-        val levelFiltered = items.filterByLevels(matchLevels)
+        val seriesFiltered = items.filterBySeries(seriesMap, hiddenSeries)
         val filtered = when (val f = _state.value.filter) {
-            ScheduleFilter.SCHEDULED -> levelFiltered.filter { it.status == f }
-            ScheduleFilter.FINISHED -> levelFiltered.filter { it.status == f }
-            else -> levelFiltered
+            ScheduleFilter.SCHEDULED -> seriesFiltered.filter { it.status == f }
+            ScheduleFilter.FINISHED -> seriesFiltered.filter { it.status == f }
+            else -> seriesFiltered
         }
         val days = filtered
             .groupBy { epochToLocalDate(it.startTime) }
@@ -206,6 +208,14 @@ class ScheduleViewModel(
                 days = days,
                 totalCount = filtered.size,
             )
+        }
+    }
+
+    /** 系列赛屏蔽映射（tournament_id → 系列赛），失败时为空映射、过滤自动失效 */
+    private fun fetchSeriesMap() {
+        viewModelScope.launch {
+            seriesMap = runCatching { repository.tournamentSeriesMap() }.getOrDefault(emptyMap())
+            recompute()
         }
     }
 

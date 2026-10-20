@@ -55,7 +55,7 @@ import com.rzh.valo.data.MatchItem
 import com.rzh.valo.data.MatchStatus
 import com.rzh.valo.data.ThemeMode
 import com.rzh.valo.data.formatWidgetTime
-import com.rzh.valo.data.filterByLevels
+import com.rzh.valo.data.filterBySeries
 import com.rzh.valo.data.nowMillis
 import java.util.Locale
 import coil.imageLoader
@@ -110,9 +110,18 @@ object ScheduleWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val container = (context.applicationContext as ValoApplication).container
         val data = withContext(Dispatchers.IO) {
+            val hiddenSeries = container.settingsStore.scheduleHiddenSeries.first()
             WidgetData(
                 items = container.repository.loadSnapshot()?.items.orEmpty(),
-                matchLevels = container.settingsStore.matchLevels.first(),
+                hiddenSeries = hiddenSeries,
+                // 后台刷新优先读磁盘快照（不发网络）；无快照时才按 TTL 拉取
+                seriesMap = if (hiddenSeries.isEmpty()) {
+                    emptyMap()
+                } else {
+                    runCatching {
+                        container.repository.cachedSeriesMap() ?: container.repository.tournamentSeriesMap()
+                    }.getOrDefault(emptyMap())
+                },
                 themeMode = container.settingsStore.themeMode.first(),
             )
         }
@@ -125,7 +134,7 @@ object ScheduleWidget : GlanceAppWidget() {
         val palette = WidgetPalette(if (darkTheme) WidgetDarkColors else WidgetLightColors)
         // 队标并发加载，Coil 磁盘缓存命中时不发网络
         val rows = coroutineScope {
-            widgetRows(data.items, data.matchLevels).map { row ->
+            widgetRows(data.items, data.seriesMap, data.hiddenSeries).map { row ->
                 async {
                     row.copy(
                         mainLogo = loadLogo(context, row.mainLogoPath),
@@ -144,7 +153,8 @@ object ScheduleWidget : GlanceAppWidget() {
 
     private data class WidgetData(
         val items: List<MatchItem>,
-        val matchLevels: Set<String>,
+        val hiddenSeries: Set<String>,
+        val seriesMap: Map<String, String>,
         val themeMode: ThemeMode,
     )
 
@@ -289,17 +299,21 @@ object ScheduleWidget : GlanceAppWidget() {
         val guestLogo: Bitmap? = null,
     )
 
-    private fun widgetRows(items: List<MatchItem>, matchLevels: Set<String>): List<RowModel> {
+    private fun widgetRows(
+        items: List<MatchItem>,
+        seriesMap: Map<String, String>,
+        hiddenSeries: Set<String>,
+    ): List<RowModel> {
         val now = nowMillis()
-        val levelFiltered = items.filterByLevels(matchLevels)
+        val seriesFiltered = items.filterBySeries(seriesMap, hiddenSeries)
         // 按状态过滤：进行中/未开赛都保留（开赛时间已过但状态未更新也继续展示），
         // 直到真正结束后才移出；全部结束时回退展示最近的完赛比赛。
-        val active = levelFiltered
+        val active = seriesFiltered
             .filter { it.status != MatchStatus.FINISHED }
             .sortedBy { it.startTime }
             .take(4)
         val selected = active.ifEmpty {
-            levelFiltered.filter { it.status == MatchStatus.FINISHED }.sortedByDescending { it.startTime }.take(4)
+            seriesFiltered.filter { it.status == MatchStatus.FINISHED }.sortedByDescending { it.startTime }.take(4)
         }
         return selected.map { item ->
             val mainParticipant = item.versus?.mainCamp?.firstOrNull()

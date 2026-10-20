@@ -5,9 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.rzh.valo.data.MatchItem
 import com.rzh.valo.data.MatchRepository
 import com.rzh.valo.data.MatchStatus
-import com.rzh.valo.data.MATCH_LEVELS
 import com.rzh.valo.data.SettingsStore
-import com.rzh.valo.data.filterByLevels
+import com.rzh.valo.data.filterBySeries
 import com.rzh.valo.data.nowMillis
 import com.rzh.valo.data.plusDays
 import com.rzh.valo.data.startOfDayMillis
@@ -44,17 +43,19 @@ class HomeViewModel(
     private val _state = MutableStateFlow(HomeUiState())
     val state = _state.asStateFlow()
     private var items: List<MatchItem> = emptyList()
-    private var matchLevels: Set<String> = MATCH_LEVELS.toSet()
+    private var hiddenSeries: Set<String> = emptySet()
+    private var seriesMap: Map<String, String> = emptyMap()
     /** 上次发起联网加载的时间，作为回前台是否再验证的依据 */
     private var lastRequestedAt = 0L
 
     init {
         viewModelScope.launch {
-            settingsStore.matchLevels.collectLatest {
-                matchLevels = it
+            settingsStore.scheduleHiddenSeries.collectLatest {
+                hiddenSeries = it
                 recompute()
             }
         }
+        fetchSeriesMap()
         loadCached()
     }
 
@@ -94,6 +95,7 @@ class HomeViewModel(
     /** 联网拉取；[force] 为 true 表示用户手动下拉（绕过接口层缓存并显示下拉指示器） */
     private fun loadInternal(force: Boolean) {
         lastRequestedAt = nowMillis()
+        fetchSeriesMap()
         viewModelScope.launch {
             _state.update { it.copy(loading = !it.hasMatches, refreshing = force, error = null) }
             try {
@@ -113,8 +115,16 @@ class HomeViewModel(
         }
     }
 
+    /** 系列赛屏蔽映射（tournament_id → 系列赛），失败时为空映射、过滤自动失效 */
+    private fun fetchSeriesMap() {
+        viewModelScope.launch {
+            seriesMap = runCatching { repository.tournamentSeriesMap() }.getOrDefault(emptyMap())
+            recompute()
+        }
+    }
+
     private fun recompute(date: LocalDate = _state.value.date) {
-        val filtered = items.filterByLevels(matchLevels)
+        val filtered = items.filterBySeries(seriesMap, hiddenSeries)
         _state.update {
             it.copy(
                 date = date,

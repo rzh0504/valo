@@ -1,5 +1,6 @@
 package com.rzh.valo.data
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -76,6 +77,7 @@ class MatchRepository(
     private val stageCache = TtlCache<String, List<TournamentStage>>(WINDOW_TTL)
     private val integralCache = TtlCache<Pair<String, String>, List<IntegralGroup>>(WINDOW_TTL)
     private val tournamentListCache = TtlCache<Unit, List<TournamentItem>>(WINDOW_TTL)
+    private val seriesCache = TtlCache<Unit, Map<String, String>>(DAY)
 
     /**
      * 拉取 [startTime, endTime) 时间窗内的比赛（升序）。
@@ -179,6 +181,26 @@ class MatchRepository(
         withContext(Dispatchers.Default) {
             tournamentListCache.get(Unit, force) { fetchTournaments() }
         }
+
+    /**
+     * tournament_id → 系列赛 id 映射（主系列优先、缺失时用子系列，与赛事卡展示名前缀规则一致），
+     * 供赛程的系列赛过滤使用：低频数据按天缓存；内存与网络都不可用时回退磁盘快照，仍无快照才抛出。
+     */
+    suspend fun tournamentSeriesMap(force: Boolean = false): Map<String, String> =
+        withContext(Dispatchers.Default) {
+            try {
+                seriesCache.get(Unit, force) {
+                    buildSeriesMap(tournamentList(force)).also { store.saveSeries(it) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                store.loadSeries() ?: throw e
+            }
+        }
+
+    /** 仅读磁盘快照的映射（不发网络）：小组件等后台场景优先用，避免为算过滤而联网 */
+    suspend fun cachedSeriesMap(): Map<String, String>? = store.loadSeries()
 
     /** 赛事阶段与分组，单赛事缓存 [WINDOW_TTL]。 */
     suspend fun tournamentStages(tournamentId: String, force: Boolean = false): List<TournamentStage> =
@@ -349,4 +371,16 @@ class MatchRepository(
 
         private const val GAME_MAPS_KEY = "game_maps"
     }
+}
+
+/** tournament_id → 系列赛 id 映射（series_info 优先、second_series_info 兜底）；
+ * 无系列与空 id 的赛事不进映射，对应的比赛在系列过滤中始终显示。 */
+internal fun buildSeriesMap(items: List<TournamentItem>): Map<String, String> {
+    val map = HashMap<String, String>()
+    for (item in items) {
+        val info = item.series ?: item.secondSeries ?: continue
+        if (info.id.isBlank()) continue
+        map[item.id] = info.id
+    }
+    return map
 }

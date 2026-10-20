@@ -32,11 +32,13 @@ class SnapshotStore(baseDir: String) {
     private val json = Json { ignoreUnknownKeys = true }
     private val fs = FileSystem.SYSTEM
     private val file = "$baseDir/schedule_snapshot.json".toPath()
+    private val seriesFile = "$baseDir/series_index.json".toPath()
     private val mutex = Mutex()
 
     suspend fun save(items: List<MatchItem>, coveredStart: Long, coveredEnd: Long) = mutex.withLock {
         val previous = loadLocked()
-        write(
+        writeJson(
+            file,
             Snapshot(
                 fetchedAt = nowMillis(),
                 items = items,
@@ -50,7 +52,8 @@ class SnapshotStore(baseDir: String) {
 
     suspend fun saveHome(items: List<MatchItem>) = mutex.withLock {
         val previous = loadLocked()
-        write(
+        writeJson(
+            file,
             Snapshot(
                 fetchedAt = previous?.fetchedAt ?: 0L,
                 items = previous?.items.orEmpty(),
@@ -64,22 +67,29 @@ class SnapshotStore(baseDir: String) {
 
     suspend fun load(): Snapshot? = mutex.withLock { loadLocked() }
 
-    private fun loadLocked(): Snapshot? = runCatching {
-        if (!fs.exists(file)) return null
-        fs.read(file) { readUtf8() }
+    /** 系列赛映射（低频数据）：成功拉取后写入，供离线与冷启动兜底 */
+    suspend fun saveSeries(seriesMap: Map<String, String>) = mutex.withLock { writeJson(seriesFile, seriesMap) }
+
+    suspend fun loadSeries(): Map<String, String>? = mutex.withLock { readJson(seriesFile) }
+
+    private fun loadLocked(): Snapshot? = readJson(file)
+
+    private inline fun <reified T : Any> readJson(path: okio.Path): T? = runCatching {
+        if (!fs.exists(path)) return null
+        fs.read(path) { readUtf8() }
     }
-        .mapCatching { json.decodeFromString<Snapshot>(it) }
+        .mapCatching { json.decodeFromString<T>(it) }
         .onFailure { logWarn("valo", "快照读取失败", it) }
         .getOrNull()
 
-    private fun write(snapshot: Snapshot) {
+    private inline fun <reified T> writeJson(path: okio.Path, value: T) {
         runCatching {
-            val tmp = file.parent!! / (file.name + ".tmp")
-            fs.write(tmp) { writeUtf8(json.encodeToString(snapshot)) }
+            val tmp = path.parent!! / (path.name + ".tmp")
+            fs.write(tmp) { writeUtf8(json.encodeToString(value)) }
             // 原子替换失败时退回直接覆盖
-            runCatching { fs.atomicMove(tmp, file) }
+            runCatching { fs.atomicMove(tmp, path) }
                 .onFailure {
-                    fs.write(file) { writeUtf8(json.encodeToString(snapshot)) }
+                    fs.write(path) { writeUtf8(json.encodeToString(value)) }
                     fs.delete(tmp)
                 }
         }.onFailure { logWarn("valo", "快照写入失败", it) }

@@ -34,12 +34,16 @@ enum class NavBarStyle(val id: Int, val label: String) {
     }
 }
 
-val MATCH_LEVELS = listOf("S", "A", "B", "C")
-
-/** 按用户勾选的赛事级别过滤；接口未标注级别（或级别不在已知集合内）的比赛始终保留 */
-fun List<MatchItem>.filterByLevels(enabled: Set<String>): List<MatchItem> = filter { match ->
-    val level = match.level?.uppercase()
-    level !in MATCH_LEVELS || level in enabled
+/**
+ * 按屏蔽的系列赛过滤；[seriesMap] 为 tournament_id → 系列赛 id 映射，
+ * 映射不到（赛事未收录或无系列归属）的比赛始终保留。
+ */
+fun List<MatchItem>.filterBySeries(seriesMap: Map<String, String>, hidden: Set<String>): List<MatchItem> {
+    if (hidden.isEmpty()) return this
+    return filter { match ->
+        val seriesId = match.tournament?.id?.let(seriesMap::get)
+        seriesId == null || seriesId !in hidden
+    }
 }
 
 /** 赛事页持久化的筛选状态（「保存筛选」开关开启时写入/恢复） */
@@ -54,7 +58,7 @@ data class TournamentSavedFilters(
 class SettingsStore(private val dataStore: DataStore<Preferences>) {
 
     private val themeKey = intPreferencesKey("theme_mode")
-    private val matchLevelsKey = stringSetPreferencesKey("match_levels")
+    private val hiddenSeriesKey = stringSetPreferencesKey("schedule_hidden_series")
     private val navBarStyleKey = intPreferencesKey("nav_bar_style")
     private val tournamentSaveFiltersKey = booleanPreferencesKey("tournament_save_filters")
     private val tournamentZoneKey = stringPreferencesKey("tournament_zone")
@@ -70,9 +74,9 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         NavBarStyle.from(it[navBarStyleKey] ?: NavBarStyle.DEFAULT.id)
     }
 
-    /** 赛程中保留的赛事级别；接口未提供级别的比赛始终保留。 */
-    val matchLevels: Flow<Set<String>> = dataStore.data.map {
-        (it[matchLevelsKey] ?: MATCH_LEVELS.toSet()).intersect(MATCH_LEVELS.toSet())
+    /** 赛程中屏蔽的系列赛 id；未写入时默认屏蔽目录中的非热门系列，目录外系列始终显示。 */
+    val scheduleHiddenSeries: Flow<Set<String>> = dataStore.data.map {
+        it[hiddenSeriesKey] ?: DEFAULT_HIDDEN_SERIES
     }
 
     /** 赛事页「保存筛选」开关（默认关闭，关闭时不读写筛选值） */
@@ -111,12 +115,13 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         }
     }
 
-    suspend fun setMatchLevel(level: String, enabled: Boolean) {
-        if (level !in MATCH_LEVELS) return
+    /** 记录/取消屏蔽一个系列赛（[hidden] 为 true 表示屏蔽）；首次编辑以默认屏蔽集为基底 */
+    suspend fun setSeriesHidden(id: String, hidden: Boolean) {
+        if (id.isBlank()) return
         dataStore.edit {
-            val levels = (it[matchLevelsKey] ?: MATCH_LEVELS.toSet()).toMutableSet()
-            if (enabled) levels += level else levels -= level
-            it[matchLevelsKey] = levels
+            val series = (it[hiddenSeriesKey] ?: DEFAULT_HIDDEN_SERIES).toMutableSet()
+            if (hidden) series += id else series -= id
+            it[hiddenSeriesKey] = series
         }
     }
 

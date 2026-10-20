@@ -13,7 +13,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.rzh.valo.data.MATCH_LEVELS
 import com.rzh.valo.data.NavBarStyle
 import com.rzh.valo.data.ThemeMode
 import com.rzh.valo.ui.LocalAppContainer
@@ -34,12 +33,9 @@ private val THEME_LABELS = ThemeMode.entries.map { it.label }
 /** 导航栏样式下拉选项（顺序与 NavBarStyle.entries 一致） */
 private val NAV_BAR_LABELS = NavBarStyle.entries.map { it.label }
 
-/** 设置页入口的摘要：全选/全不选给结论，部分勾选列出级别 */
-private fun levelsSummary(selected: Set<String>): String = when {
-    selected.size == MATCH_LEVELS.size -> "全部级别"
-    selected.isEmpty() -> "仅显示未标注级别的比赛"
-    else -> MATCH_LEVELS.filter { it in selected }.joinToString(" · ")
-}
+/** 设置页入口的摘要：未屏蔽给结论，屏蔽时给数量 */
+private fun seriesSummary(hiddenSeries: Set<String>): String =
+    if (hiddenSeries.isEmpty()) "全部系列显示" else "已隐藏 ${hiddenSeries.size} 个系列"
 
 /** 检查更新条目的摘要文案 */
 private fun updateSummary(state: UpdateCheck): String? = when (state) {
@@ -66,7 +62,7 @@ fun SettingsScreen(
     }
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val navigationBarStyle by viewModel.navigationBarStyle.collectAsStateWithLifecycle()
-    val matchLevels by viewModel.matchLevels.collectAsStateWithLifecycle()
+    val hiddenSeries by viewModel.hiddenSeries.collectAsStateWithLifecycle()
     val updateCheck by viewModel.updateCheck.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior()
 
@@ -111,7 +107,7 @@ fun SettingsScreen(
                 Card(modifier = Modifier.padding(horizontal = 12.dp)) {
                     ArrowPreference(
                         title = "管理过滤项",
-                        summary = levelsSummary(matchLevels),
+                        summary = seriesSummary(hiddenSeries),
                         onClick = onOpenScheduleFilter,
                     )
                 }

@@ -3,7 +3,6 @@ package com.rzh.valo.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rzh.valo.data.AppContainer
-import com.rzh.valo.data.MATCH_LEVELS
 import com.rzh.valo.data.NavBarStyle
 import com.rzh.valo.data.SettingsStore
 import com.rzh.valo.data.ThemeMode
@@ -39,8 +38,9 @@ class SettingsViewModel(
     val themeMode: StateFlow<ThemeMode> =
         container.settingsStore.themeMode.stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.SYSTEM)
 
-    val matchLevels: StateFlow<Set<String>> =
-        container.settingsStore.matchLevels.stateIn(viewModelScope, SharingStarted.Eagerly, MATCH_LEVELS.toSet())
+    /** 赛程中屏蔽的系列赛 id（仅用于设置页摘要展示） */
+    val hiddenSeries: StateFlow<Set<String>> =
+        container.settingsStore.scheduleHiddenSeries.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     val navigationBarStyle: StateFlow<NavBarStyle> =
         container.settingsStore.navigationBarStyle.stateIn(viewModelScope, SharingStarted.Eagerly, NavBarStyle.DEFAULT)
@@ -58,13 +58,6 @@ class SettingsViewModel(
     fun setNavigationBarStyle(style: NavBarStyle) {
         viewModelScope.launch {
             container.settingsStore.setNavigationBarStyle(style)
-        }
-    }
-
-    fun setMatchLevel(level: String, enabled: Boolean) {
-        viewModelScope.launch {
-            container.settingsStore.setMatchLevel(level, enabled)
-            onWidgetDataChanged?.invoke()
         }
     }
 
