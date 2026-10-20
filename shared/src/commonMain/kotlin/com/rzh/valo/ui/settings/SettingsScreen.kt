@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rzh.valo.data.NavBarStyle
+import com.rzh.valo.data.SERIES_CATALOG
 import com.rzh.valo.data.ThemeMode
 import com.rzh.valo.ui.LocalAppContainer
 import com.rzh.valo.ui.LocalVersionName
@@ -33,9 +34,9 @@ private val THEME_LABELS = ThemeMode.entries.map { it.label }
 /** 导航栏样式下拉选项（顺序与 NavBarStyle.entries 一致） */
 private val NAV_BAR_LABELS = NavBarStyle.entries.map { it.label }
 
-/** 设置页入口的摘要：未屏蔽给结论，屏蔽时给数量 */
+/** 设置页入口的摘要：目录中已勾选（显示）的系列数 */
 private fun seriesSummary(hiddenSeries: Set<String>): String =
-    if (hiddenSeries.isEmpty()) "全部系列显示" else "已隐藏 ${hiddenSeries.size} 个系列"
+    "已选择 ${SERIES_CATALOG.count { it.id !in hiddenSeries }} 个系列"
 
 /** 检查更新条目的摘要文案 */
 private fun updateSummary(state: UpdateCheck): String? = when (state) {

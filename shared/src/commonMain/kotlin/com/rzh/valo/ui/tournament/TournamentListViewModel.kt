@@ -67,11 +67,17 @@ class TournamentListViewModel(
     init {
         loadInternal(force = false)
         viewModelScope.launch {
-            // 「保存筛选」开启时，恢复上次持久化的筛选值
+            // 「保存筛选」开启时，恢复开关状态与上次持久化的筛选值
             if (settingsStore.tournamentFiltersSaved.first()) {
                 val saved = settingsStore.tournamentFilters.first()
                 _state.update {
-                    it.copy(zone = saved.zone, level = saved.level, year = saved.year, status = saved.status)
+                    it.copy(
+                        saveFilters = true,
+                        zone = saved.zone,
+                        level = saved.level,
+                        year = saved.year,
+                        status = saved.status,
+                    )
                 }
             }
         }
