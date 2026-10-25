@@ -51,7 +51,6 @@ import com.rzh.valo.ui.components.LoadingPane
 import com.rzh.valo.ui.components.MatchCard
 import com.rzh.valo.ui.components.OnResumeEffect
 import com.rzh.valo.ui.components.TeamLogo
-import com.rzh.valo.ui.schedule.FilterSegments
 import com.rzh.valo.ui.schedule.ScheduleFilter
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -304,15 +303,26 @@ private fun FilterSheet(
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 Spacer(Modifier.height(8.dp))
-                FilterSegments(
-                    options = listOf(
-                        ScheduleFilter.ALL to "全部",
-                        ScheduleFilter.SCHEDULED to "未开始",
-                        ScheduleFilter.FINISHED to "已结束",
-                    ),
-                    selected = state.statusFilter,
-                    onSelect = { viewModel.setStatusFilter(it) },
-                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(
+                        label = "全部",
+                        selected = state.statusFilter == ScheduleFilter.ALL,
+                        onClick = { viewModel.setStatusFilter(ScheduleFilter.ALL) },
+                    )
+                    FilterChip(
+                        label = "未开始",
+                        selected = state.statusFilter == ScheduleFilter.SCHEDULED,
+                        onClick = { viewModel.setStatusFilter(ScheduleFilter.SCHEDULED) },
+                    )
+                    FilterChip(
+                        label = "已结束",
+                        selected = state.statusFilter == ScheduleFilter.FINISHED,
+                        onClick = { viewModel.setStatusFilter(ScheduleFilter.FINISHED) },
+                    )
+                }
             }
             Column {
                 Text(
@@ -321,21 +331,24 @@ private fun FilterSheet(
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 )
                 Spacer(Modifier.height(8.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     val today = todayCn()
-                    RangeChip(
+                    FilterChip(
                         label = "不限",
                         selected = state.rangePreset == null,
                         onClick = { viewModel.setRange(null, null, null, null) },
                     )
-                    RangeChip(
+                    FilterChip(
                         label = "近3个月",
                         selected = state.rangePreset == "3m",
                         onClick = {
                             viewModel.setRange("3m", "近3个月", today.minusMonths(3), today)
                         },
                     )
-                    RangeChip(
+                    FilterChip(
                         label = "今年",
                         selected = state.rangePreset == "year",
                         onClick = {
@@ -347,7 +360,7 @@ private fun FilterSheet(
                             )
                         },
                     )
-                    RangeChip(
+                    FilterChip(
                         label = "去年",
                         selected = state.rangePreset == "last",
                         onClick = {
@@ -360,7 +373,7 @@ private fun FilterSheet(
                             )
                         },
                     )
-                    RangeChip(
+                    FilterChip(
                         label = "自定义…",
                         selected = state.rangePreset == "custom",
                         onClick = onPickCustomRange,
@@ -369,11 +382,6 @@ private fun FilterSheet(
             }
         }
     }
-}
-
-@Composable
-private fun RangeChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(label = label, selected = selected, onClick = onClick)
 }
 
 @Composable

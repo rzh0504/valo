@@ -318,22 +318,6 @@ private fun ScheduleFilterRow(
     }
 }
 
-/** 状态分段选择（miuix TabRow 风格胶囊） */
-@Composable
-internal fun FilterSegments(
-    options: List<Pair<Int, String>>,
-    selected: Int,
-    onSelect: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    top.yukonga.miuix.kmp.basic.TabRow(
-        tabs = options.map { it.second },
-        selectedTabIndex = options.indexOfFirst { it.first == selected }.coerceAtLeast(0),
-        onTabSelected = { index -> onSelect(options[index].first) },
-        modifier = modifier.fillMaxWidth(),
-    )
-}
-
 @Composable
 private fun ErrorPane(message: String, onRetry: () -> Unit) {
     Column(
