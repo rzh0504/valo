@@ -6,7 +6,6 @@ import com.rzh.valo.data.MatchItem
 import com.rzh.valo.data.MatchRepository
 import com.rzh.valo.data.MatchStatus
 import com.rzh.valo.data.Participant
-import com.rzh.valo.data.PlayerStatsRow
 import com.rzh.valo.data.TeamBase
 import com.rzh.valo.data.TeamReward
 import com.rzh.valo.data.TeamRoster
@@ -41,13 +40,12 @@ data class TeamDetailUiState(
     val detailsLoading: Boolean = true,
     val roster: TeamRoster? = null,
     val stats: TeamStats? = null,
-    val playerStats: List<PlayerStatsRow> = emptyList(),
     val rewards: List<TeamReward> = emptyList(),
     val recentMatches: List<RecentMatchRow> = emptyList(),
 )
 
 /**
- * 战队详情：基础信息 / 名单 / 战队数据 / 选手数据 / 赛事名次 / 近期比赛。
+ * 战队详情：基础信息 / 名单 / 战队数据 / 赛事名次 / 近期比赛。
  * 基础信息成败决定整页成败，其余数据各自独立加载，失败不互相阻塞。
  */
 class TeamDetailViewModel(
@@ -100,11 +98,8 @@ class TeamDetailViewModel(
     private suspend fun loadAll(force: Boolean) = coroutineScope {
         val roster = async { runCatching { repository.teamRoster(teamId, force) }.getOrNull() }
         val stats = async { runCatching { repository.teamStats(teamId, force) }.getOrNull() }
-        val playerStats = async {
-            runCatching { repository.playerTeamStats(teamId, force) }.getOrDefault(emptyList())
-        }
         val rewards = async {
-            runCatching { repository.teamReward(teamId, force) }.getOrDefault(emptyList())
+            runCatching { repository.teamRewards(teamId, force) }.getOrDefault(emptyList())
         }
         val recent = async {
             runCatching { fetchRecentMatches(force) }.getOrDefault(emptyList())
@@ -114,7 +109,6 @@ class TeamDetailViewModel(
                 detailsLoading = false,
                 roster = roster.await() ?: it.roster,
                 stats = stats.await() ?: it.stats,
-                playerStats = playerStats.await().ifEmpty { it.playerStats },
                 rewards = rewards.await().ifEmpty { it.rewards },
                 recentMatches = recent.await().ifEmpty { it.recentMatches },
             )

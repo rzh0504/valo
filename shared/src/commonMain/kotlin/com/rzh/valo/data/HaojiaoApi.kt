@@ -135,21 +135,17 @@ class HaojiaoApi {
     suspend fun teamRecord(teamId: String): TeamRecord =
         exec(jsonRequest(HttpMethod.Post, "$BASE/wiki/api/v1/tournament/get_team_record", json.encodeToString(TeamStatsRequest(teamId, GAME_ID))))
 
-    /** 选手数据：队史选手的英雄池与 ACS/KD/ADR/KAST 等个人数据（POST） */
-    suspend fun playerTeamStats(teamId: String): List<PlayerStatsRow> =
-        exec(jsonRequest(HttpMethod.Post, "$BASE/wiki/api/v1/tournament/get_valorant_stats", json.encodeToString(TeamStatsRequest(teamId, GAME_ID))))
-
-    /** 赛事名次与奖金 */
-    suspend fun teamReward(teamId: String): List<TeamReward> =
-        exec<TeamRewardData>(
+    /** 赛事名次与奖金（分页） */
+    suspend fun teamRewards(teamId: String, page: Int, pageSize: Int): TeamRewardData =
+        exec(
             get("$BASE/wiki/api/v1/team/reward") {
                 parameters.append("team_id", teamId)
                 parameters.append("full", "false")
-                parameters.append("page", "1")
-                parameters.append("page_size", "10")
+                parameters.append("page", page.toString())
+                parameters.append("page_size", pageSize.toString())
                 parameters.append("platform", "web")
             }
-        ).let { data -> data.list }
+        )
 
     // ---------- 内部：请求构造 + 签名头 + 解密 + 信封解析 ----------
 

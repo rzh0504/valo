@@ -182,57 +182,12 @@ data class TeamRecord(
     @SerialName("round_win_count") val roundWinCount: Int = 0,
 )
 
-/** 选手数据条目（tournament/get_valorant_stats，队史所有选手） */
-@Serializable
-data class PlayerStatsRow(
-    @SerialName("player_info") val person: PlayerStatsPerson? = null,
-    @SerialName("career_info") val career: PlayerStatsCareer? = null,
-    val heroes: List<HeroUsage> = emptyList(),
-    @SerialName("round_num") val rounds: Int = 0,
-    val acs: Double = 0.0,
-    val kd: Double = 0.0,
-    val kda: Double = 0.0,
-    val kills: Int = 0,
-    val deaths: Int = 0,
-    val assists: Int = 0,
-    val adr: Double = 0.0,
-    val kast: Double = 0.0,
-    val hs: Double = 0.0,
-    val fk: Int = 0,
-) {
-    /** 1 现役 · 2 已离队 */
-    val isActive: Boolean get() = career?.careerStatus == 1
-}
-
-@Serializable
-data class PlayerStatsPerson(
-    @SerialName("person_id") val id: String = "",
-    @SerialName("real_name") val realName: String? = null,
-    val icon: String? = null,
-    @SerialName("nationality_icon") val nationalityIcon: String? = null,
-)
-
-@Serializable
-data class PlayerStatsCareer(
-    @SerialName("career_id") val id: String = "",
-    @SerialName("id_name") val idName: String? = null,
-    @SerialName("career_status") val careerStatus: Int = 0,
-)
-
-@Serializable
-data class HeroUsage(
-    @SerialName("hero_zh") val nameZh: String? = null,
-    @SerialName("hero_en") val nameEn: String? = null,
-    val icon: String? = null,
-    val times: Int = 0,
-) {
-    val displayName: String get() = nameZh?.takeIf { it.isNotBlank() } ?: nameEn.orEmpty()
-}
-
 /** 赛事名次与奖金（team/reward，一条 = 一次赛事征程） */
 @Serializable
 data class TeamReward(
+    @SerialName("unique_id") val id: String = "",
     val rank: String? = null,
+    @SerialName("reward_date") val rewardTime: Long = 0L,
     @SerialName("reward_date_str") val date: String? = null,
     @SerialName("tournament_group_info") val group: GroupInfo? = null,
     @SerialName("match_count") val matchCount: Int = 0,

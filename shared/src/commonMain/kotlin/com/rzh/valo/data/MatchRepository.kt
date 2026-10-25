@@ -72,7 +72,6 @@ class MatchRepository(
     private val teamRosterCache = TtlCache<String, TeamRoster>(HALF_DAY_TTL)
     private val teamStatsCache = TtlCache<String, TeamStats>(HALF_DAY_TTL)
     private val teamRecordCache = TtlCache<String, TeamRecord>(HALF_DAY_TTL)
-    private val playerTeamStatsCache = TtlCache<String, List<PlayerStatsRow>>(HALF_DAY_TTL)
     private val teamRewardCache = TtlCache<String, List<TeamReward>>(HALF_DAY_TTL)
     private val stageCache = TtlCache<String, List<TournamentStage>>(WINDOW_TTL)
     private val integralCache = TtlCache<Pair<String, String>, List<IntegralGroup>>(WINDOW_TTL)
@@ -166,14 +165,10 @@ class MatchRepository(
             teamRecordCache.get(teamId, force) { api.teamRecord(teamId) }
         }
 
-    suspend fun playerTeamStats(teamId: String, force: Boolean = false): List<PlayerStatsRow> =
+    /** 全部赛事名次，按时间倒序；详情页前 5 条与「查看全部」页共用同一份缓存。 */
+    suspend fun teamRewards(teamId: String, force: Boolean = false): List<TeamReward> =
         withContext(Dispatchers.Default) {
-            playerTeamStatsCache.get(teamId, force) { api.playerTeamStats(teamId) }
-        }
-
-    suspend fun teamReward(teamId: String, force: Boolean = false): List<TeamReward> =
-        withContext(Dispatchers.Default) {
-            teamRewardCache.get(teamId, force) { api.teamReward(teamId) }
+            teamRewardCache.get(teamId, force) { fetchRewards(teamId) }
         }
 
     /** 全部赛事（tournament/list，开始时间升序全量拉取），单份缓存 [WINDOW_TTL]。 */
@@ -293,6 +288,22 @@ class MatchRepository(
             page++
         }
         return all.distinctBy { it.id }
+    }
+
+    private suspend fun fetchRewards(teamId: String): List<TeamReward> {
+        val all = ArrayList<TeamReward>()
+        var page = 1
+        var count = Int.MAX_VALUE
+        while (page <= MAX_PAGES && all.size < count) {
+            val data = api.teamRewards(teamId, page, TOURNAMENT_PAGE_SIZE)
+            count = data.count
+            all += data.list
+            if (data.list.size < TOURNAMENT_PAGE_SIZE) break
+            page++
+        }
+        return all
+            .distinctBy { it.id.ifBlank { "${it.group?.id}_${it.rewardTime}" } }
+            .sortedByDescending { it.rewardTime }
     }
 
     private suspend fun fetchTournamentPages(tournamentId: String): List<MatchItem> {

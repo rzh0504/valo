@@ -32,6 +32,7 @@ import com.rzh.valo.ui.settings.AboutScreen
 import com.rzh.valo.ui.settings.ScheduleFilterScreen
 import com.rzh.valo.ui.settings.SettingsScreen
 import com.rzh.valo.ui.team.TeamDetailScreen
+import com.rzh.valo.ui.team.TeamRewardsScreen
 import com.rzh.valo.ui.team.TeamScheduleScreen
 import com.rzh.valo.ui.theme.ValoTheme
 import com.rzh.valo.ui.tournament.TournamentListScreen
@@ -149,7 +150,16 @@ private fun AppRoot(deepLink: DeepLinkState) {
                         )
                     )
                 },
+                onOpenRewards = {
+                    navigator.push(Route.TeamRewards(route.teamId, route.name))
+                },
                 onOpenMatch = openMatch,
+            )
+        }
+        entry<Route.TeamRewards> { route ->
+            TeamRewardsScreen(
+                route = route,
+                onBack = { navigator.pop() },
             )
         }
         entry<Route.TeamSchedule> { route ->

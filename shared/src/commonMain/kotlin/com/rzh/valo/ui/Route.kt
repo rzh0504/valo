@@ -29,6 +29,13 @@ sealed interface Route : NavKey {
         val icon: String = "",
     ) : Route
 
+    /** 战队详情 → 全部赛事名次 */
+    @Serializable
+    data class TeamRewards(
+        val teamId: String,
+        val name: String = "",
+    ) : Route
+
     @Serializable
     data class Tournament(val tournamentId: String, val name: String = "") : Route
 
