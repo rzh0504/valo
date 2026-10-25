@@ -3,6 +3,7 @@ package com.rzh.valo.ui.player
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rzh.valo.data.MatchRepository
+import com.rzh.valo.data.PlayerAchievement
 import com.rzh.valo.data.PlayerBase
 import com.rzh.valo.data.PlayerCareer
 import com.rzh.valo.data.PlayerCareerStats
@@ -24,6 +25,7 @@ data class PlayerDetailUiState(
     val careers: List<PlayerCareer> = emptyList(),
     val careerStats: PlayerCareerStats? = null,
     val heroData: PlayerHeroData? = null,
+    val achievements: List<PlayerAchievement> = emptyList(),
 )
 
 /** 选手详情：基础资料决定成败，成绩与生涯各自独立加载 */
@@ -65,11 +67,15 @@ class PlayerDetailViewModel(
                     val heroData = async {
                         runCatching { repository.playerHeroStats(playerId, force) }.getOrNull()
                     }
+                    val achievements = async {
+                        runCatching { repository.playerAchievements(playerId, force) }.getOrDefault(emptyList())
+                    }
                     _state.update {
                         it.copy(
                             careers = careers.await(),
                             careerStats = careerStats.await(),
                             heroData = heroData.await(),
+                            achievements = achievements.await(),
                             refreshing = false,
                         )
                     }

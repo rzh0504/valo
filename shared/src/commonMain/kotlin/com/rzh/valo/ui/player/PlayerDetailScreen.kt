@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.rzh.valo.data.PlayerAchievement
 import com.rzh.valo.data.PlayerBase
 import com.rzh.valo.data.PlayerCareer
 import com.rzh.valo.data.PlayerCareerStats
@@ -57,7 +59,7 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 
-/** 选手详情：基础资料、所属战队、简介、职业生涯与赛事成绩 */
+/** 选手详情：基础资料、职业生涯、所属战队、生涯数据、特工数据与赛事成绩 */
 @Composable
 fun PlayerDetailScreen(
     playerId: String,
@@ -65,6 +67,7 @@ fun PlayerDetailScreen(
     fallbackIcon: String,
     onBack: () -> Unit,
     onOpenTeam: (String, String, String, String) -> Unit,
+    onOpenMatch: (String) -> Unit,
 ) {
     val container = LocalAppContainer.current
     val viewModel: PlayerDetailViewModel = viewModel(key = "player_$playerId") {
@@ -107,6 +110,7 @@ fun PlayerDetailScreen(
                         fallbackName = fallbackName,
                         fallbackIcon = fallbackIcon,
                         onOpenTeam = onOpenTeam,
+                        onOpenMatch = onOpenMatch,
                     )
                 }
             }
@@ -120,6 +124,7 @@ private fun PlayerContent(
     fallbackName: String,
     fallbackIcon: String,
     onOpenTeam: (String, String, String, String) -> Unit,
+    onOpenMatch: (String) -> Unit,
 ) {
     val base = state.base
     Column(
@@ -131,6 +136,18 @@ private fun PlayerContent(
     ) {
         Spacer(Modifier.height(4.dp))
         PlayerHeaderCard(base, fallbackName, fallbackIcon)
+
+        if (state.careers.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            SectionCard("职业生涯") {
+                Column {
+                    state.careers.forEachIndexed { index, career ->
+                        if (index > 0) Spacer(Modifier.height(10.dp))
+                        CareerRow(career, onOpenTeam)
+                    }
+                }
+            }
+        }
 
         base?.team?.takeIf { it.id.isNotBlank() }?.let { team ->
             Spacer(Modifier.height(12.dp))
@@ -147,14 +164,11 @@ private fun PlayerContent(
             HeroStatsCard(heroes)
         }
 
-        if (state.careers.isNotEmpty()) {
+        if (state.achievements.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
-            SectionCard("职业生涯") {
-                Column {
-                    state.careers.forEachIndexed { index, career ->
-                        if (index > 0) Spacer(Modifier.height(10.dp))
-                        CareerRow(career, onOpenTeam)
-                    }
+            PlayerTableSection("赛事成绩") {
+                state.achievements.forEachIndexed { index, achievement ->
+                    AchievementRow(achievement, index, onOpenMatch)
                 }
             }
         }
@@ -452,6 +466,86 @@ private fun HeroStatsCard(heroes: List<PlayerHeroStat>) {
                 StatsTableCell("${hero.kills}/${hero.deaths}/${hero.assists}", 76.dp, secondary = true)
                 StatsTableCell(hero.adr.statText(1), 48.dp, secondary = true)
             }
+        }
+    }
+}
+
+@Composable
+private fun PlayerTableSection(title: String, content: @Composable () -> Unit) {
+    val scheme = MiuixTheme.colorScheme
+    Column {
+        Text(
+            title,
+            style = MiuixTheme.textStyles.footnote1,
+            color = scheme.onSurfaceVariantSummary,
+        )
+        Spacer(Modifier.height(8.dp))
+        Card(
+            cornerRadius = 16.dp,
+            insideMargin = PaddingValues(0.dp),
+            colors = CardDefaults.defaultColors(color = scheme.surfaceContainer),
+        ) {
+            Column(Modifier.fillMaxWidth()) { content() }
+        }
+    }
+}
+
+/** 成绩行：赛事 + 日期/战绩 + 名次，点击回到该次征程的最近一场比赛 */
+@Composable
+private fun AchievementRow(
+    achievement: PlayerAchievement,
+    index: Int,
+    onOpenMatch: (String) -> Unit,
+) {
+    val scheme = MiuixTheme.colorScheme
+    val matchId = achievement.lastMatch?.matchId.orEmpty()
+    val meta = listOfNotNull(
+        achievement.date?.substringBefore(' ')?.takeIf { it.isNotBlank() },
+        "${achievement.matchWinCount}胜${achievement.matchCount - achievement.matchWinCount}负",
+    ).joinToString(" · ")
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(tableZebraColor(index, scheme))
+            .then(
+                if (matchId.isNotBlank()) Modifier.clickable { onOpenMatch(matchId) } else Modifier
+            )
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        TeamLogo(achievement.group?.icon, size = 28)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                achievement.group?.nameMain.orEmpty(),
+                style = MiuixTheme.textStyles.body2,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                meta,
+                style = MiuixTheme.textStyles.footnote2,
+                color = scheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            achievement.ranking.orEmpty(),
+            style = MiuixTheme.textStyles.footnote1,
+            fontWeight = FontWeight.SemiBold,
+            color = scheme.primary,
+            maxLines = 1,
+        )
+        if (matchId.isNotBlank()) {
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = "查看比赛",
+                tint = scheme.onSurfaceVariantSummary,
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
 }

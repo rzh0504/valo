@@ -172,6 +172,7 @@ private fun AppRoot(deepLink: DeepLinkState) {
                 fallbackIcon = route.icon,
                 onBack = { navigator.pop() },
                 onOpenTeam = openTeam,
+                onOpenMatch = openMatch,
             )
         }
         entry<Route.TeamRewards> { route ->

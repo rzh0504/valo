@@ -208,7 +208,9 @@ class MatchRepository(
     /** 选手赛事成绩（一次返回全部，按半天缓存） */
     suspend fun playerAchievements(playerId: String, force: Boolean = false): List<PlayerAchievement> =
         withContext(Dispatchers.Default) {
-            playerAchievementCache.get(playerId, force) { api.playerAchievements(playerId).list }
+            playerAchievementCache.get(playerId, force) {
+                api.playerAchievements(playerId).list.sortedByDescending { it.date.orEmpty() }
+            }
         }
 
     /** 生涯数据：先从赛事成绩中取 S 级赛事，再汇总总战绩与个人指标 */

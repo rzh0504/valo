@@ -203,13 +203,25 @@ data class PlayerAchievementData(
 
 @Serializable
 data class PlayerAchievement(
+    val date: String? = null,
+    val ranking: String? = null,
     @SerialName("tournament_info") val tournament: PlayerAchievementTournament? = null,
+    @SerialName("tournament_group_info") val group: GroupInfo? = null,
+    @SerialName("last_match") val lastMatch: PlayerAchievementMatch? = null,
+    @SerialName("match_count") val matchCount: Int = 0,
+    @SerialName("match_win_count") val matchWinCount: Int = 0,
 )
 
 @Serializable
 data class PlayerAchievementTournament(
     @SerialName("tournament_id") val id: String = "",
     val level: String? = null,
+)
+
+/** 成绩条目关联的最近一场比赛（仅取跳转所需 id） */
+@Serializable
+data class PlayerAchievementMatch(
+    @SerialName("match_id") val matchId: String = "",
 )
 
 /** S 级赛事总战绩（player/get_top_tournament_stats） */
