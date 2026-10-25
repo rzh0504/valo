@@ -47,6 +47,7 @@ import com.rzh.valo.data.formatTime
 import com.rzh.valo.ui.LocalAppContainer
 import com.rzh.valo.ui.Route
 import com.rzh.valo.ui.components.LoadingPane
+import com.rzh.valo.ui.components.SectionCard
 import com.rzh.valo.ui.components.StatsTableCard
 import com.rzh.valo.ui.components.StatsTableCell
 import com.rzh.valo.ui.components.StatsTableHeaderRow
@@ -73,6 +74,7 @@ fun TeamDetailScreen(
     onBack: () -> Unit,
     onOpenSchedule: () -> Unit,
     onOpenRewards: () -> Unit,
+    onOpenPlayer: (String, String, String) -> Unit,
     onOpenMatch: (String) -> Unit,
 ) {
     val container = LocalAppContainer.current
@@ -152,7 +154,7 @@ fun TeamDetailScreen(
                         state.roster?.let { roster ->
                             if (roster.active.isNotEmpty()) {
                                 Spacer(Modifier.height(12.dp))
-                                TeamRosterCard(roster.active)
+                                TeamRosterCard(roster.active, onOpenPlayer)
                             }
                         }
                     }
@@ -391,23 +393,44 @@ private fun TeamRewardCard(rewards: List<TeamReward>, onOpenRewards: () -> Unit)
 
 private const val REWARD_PREVIEW_COUNT = 5
 
-/** 选手名单：现役（替补/不活跃带标注） */
+/** 选手名单：现役（替补/不活跃带标注），选手行可进入选手详情 */
 @Composable
-private fun TeamRosterCard(active: List<RosterMember>) {
+private fun TeamRosterCard(
+    active: List<RosterMember>,
+    onOpenPlayer: (String, String, String) -> Unit,
+) {
     SectionCard(title = "选手名单") {
         active.forEachIndexed { index, member ->
             if (index > 0) Spacer(Modifier.height(10.dp))
-            RosterRow(member)
+            RosterRow(member, onOpenPlayer)
         }
     }
 }
 
 @Composable
-private fun RosterRow(member: RosterMember) {
+private fun RosterRow(member: RosterMember, onOpenPlayer: (String, String, String) -> Unit) {
     val scheme = MiuixTheme.colorScheme
     val person = member.person
     val career = member.career
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    val playerId = person?.id?.takeIf { it.isNotBlank() && career?.type == 1 }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (playerId != null) {
+                    Modifier.clickable {
+                        onOpenPlayer(
+                            playerId,
+                            career?.idName?.takeIf { it.isNotBlank() } ?: person?.name.orEmpty(),
+                            person?.icon.orEmpty(),
+                        )
+                    }
+                } else {
+                    Modifier
+                }
+            ),
+    ) {
         TeamLogo(person?.icon, size = 36, shape = RoundedCornerShape(50))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
@@ -454,25 +477,14 @@ private fun RosterRow(member: RosterMember) {
                 color = scheme.onSurfaceVariantSummary,
             )
         }
-    }
-}
-
-/** 详情页通用区块卡：标题 + 圆角低阴影容器（与前瞻区块一致） */
-@Composable
-private fun SectionCard(title: String, content: @Composable () -> Unit) {
-    val scheme = MiuixTheme.colorScheme
-    Column {
-        Text(
-            title,
-            style = MiuixTheme.textStyles.footnote1,
-            color = scheme.onSurfaceVariantSummary,
-        )
-        Spacer(Modifier.height(8.dp))
-        Card(
-            cornerRadius = 16.dp,
-            colors = CardDefaults.defaultColors(color = scheme.surfaceContainer),
-        ) {
-            Column(Modifier.fillMaxWidth().padding(16.dp)) { content() }
+        if (playerId != null) {
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = "进入选手详情",
+                tint = scheme.onSurfaceVariantSummary,
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
 }

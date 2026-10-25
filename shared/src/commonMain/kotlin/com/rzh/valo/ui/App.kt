@@ -27,6 +27,7 @@ import com.rzh.valo.data.Participant
 import com.rzh.valo.data.ThemeMode
 import com.rzh.valo.ui.detail.MatchDetailScreen
 import com.rzh.valo.ui.home.HomeScreen
+import com.rzh.valo.ui.player.PlayerDetailScreen
 import com.rzh.valo.ui.schedule.ScheduleScreen
 import com.rzh.valo.ui.settings.AboutScreen
 import com.rzh.valo.ui.settings.ScheduleFilterScreen
@@ -95,6 +96,12 @@ private fun AppRoot(deepLink: DeepLinkState) {
     val navigator = remember { Navigator(backStack) }
     val openMatch: (String) -> Unit = { navigator.push(Route.Match(it)) }
     val openTournament: (String, String) -> Unit = { id, name -> navigator.push(Route.Tournament(id, name)) }
+    val openTeam: (String, String, String, String) -> Unit = { id, name, short, icon ->
+        navigator.push(Route.TeamInfo(id, name, short, icon))
+    }
+    val openPlayer: (String, String, String) -> Unit = { id, name, icon ->
+        navigator.push(Route.Player(id, name, icon))
+    }
 
     // 小组件深链：进入应用后跳转比赛详情
     LaunchedEffect(deepLink.pendingMatchId) {
@@ -134,6 +141,7 @@ private fun AppRoot(deepLink: DeepLinkState) {
                     }
                 },
                 onOpenTournament = openTournament,
+                onOpenPlayer = openPlayer,
             )
         }
         entry<Route.TeamInfo> { route ->
@@ -153,7 +161,17 @@ private fun AppRoot(deepLink: DeepLinkState) {
                 onOpenRewards = {
                     navigator.push(Route.TeamRewards(route.teamId, route.name))
                 },
+                onOpenPlayer = openPlayer,
                 onOpenMatch = openMatch,
+            )
+        }
+        entry<Route.Player> { route ->
+            PlayerDetailScreen(
+                playerId = route.playerId,
+                fallbackName = route.name,
+                fallbackIcon = route.icon,
+                onBack = { navigator.pop() },
+                onOpenTeam = openTeam,
             )
         }
         entry<Route.TeamRewards> { route ->

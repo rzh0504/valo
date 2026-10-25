@@ -150,6 +150,142 @@ data class TeamRoster(
     @SerialName("organization_rosters") val organization: List<RosterMember> = emptyList(),
 )
 
+/** 选手基础资料（player/base，web 前端在用；唯一 id 同时用于其他选手接口） */
+@Serializable
+data class PlayerBase(
+    @SerialName("unique_id") val id: String = "",
+    @SerialName("real_name") val realName: String? = null,
+    @SerialName("real_name_en") val realNameEn: String? = null,
+    val icon: String? = null,
+    val banner: String? = null,
+    val tag: String? = null,
+    val describe: String? = null,
+    val introduction: String? = null,
+    val nationality: String? = null,
+    @SerialName("nationality_icon") val nationalityIcon: String? = null,
+    val birth: String? = null,
+    @SerialName("career_id_name") val idName: String? = null,
+    val position: String? = null,
+    val role: String? = null,
+    @SerialName("is_sub") val isSub: Boolean = false,
+    @SerialName("is_inactive") val isInactive: Boolean = false,
+    @SerialName("is_retire") val isRetire: Boolean = false,
+    @SerialName("career_status") val careerStatus: Int = 0,
+    @SerialName("team_info") val team: TeamRef? = null,
+) {
+    val displayName: String get() = idName?.takeIf { it.isNotBlank() } ?: realName.orEmpty()
+    /** 简介：优先完整介绍，缺失时退回简述 */
+    val bio: String get() = introduction?.takeIf { it.isNotBlank() } ?: describe.orEmpty()
+}
+
+/** 选手曾效力战队（player/career_info） */
+@Serializable
+data class PlayerCareer(
+    @SerialName("unique_id") val id: String = "",
+    val position: String? = null,
+    val role: String? = null,
+    @SerialName("career_type") val careerType: Int = 0,
+    @SerialName("is_retire") val isRetire: Boolean = false,
+    @SerialName("career_status") val careerStatus: Int = 0,
+    @SerialName("start_date") val startDate: String? = null,
+    @SerialName("end_date") val endDate: String? = null,
+    @SerialName("team_info") val team: TeamRef? = null,
+) {
+    val roleLabel: String get() = listOfNotNull(position, role).filter { it.isNotBlank() }.joinToString(" / ")
+}
+
+/** 选手赛事成绩（player/achievement）；生涯数据只取其中的赛事与级别 */
+@Serializable
+data class PlayerAchievementData(
+    val count: Int = 0,
+    val list: List<PlayerAchievement> = emptyList(),
+)
+
+@Serializable
+data class PlayerAchievement(
+    @SerialName("tournament_info") val tournament: PlayerAchievementTournament? = null,
+)
+
+@Serializable
+data class PlayerAchievementTournament(
+    @SerialName("tournament_id") val id: String = "",
+    val level: String? = null,
+)
+
+/** S 级赛事总战绩（player/get_top_tournament_stats） */
+@Serializable
+data class PlayerTopStats(
+    @SerialName("match_count") val matchCount: Int = 0,
+    @SerialName("match_win_count") val matchWinCount: Int = 0,
+    @SerialName("round_count") val roundCount: Int = 0,
+    @SerialName("round_win_count") val roundWinCount: Int = 0,
+)
+
+/** 指定赛事汇总的个人指标（player/get_stats） */
+@Serializable
+data class PlayerStats(
+    val acs: Double? = null,
+    val adr: Double? = null,
+    val kd: Double? = null,
+    val kda: Double? = null,
+    val kast: Double? = null,
+    val kills: Int = 0,
+    val deaths: Int = 0,
+    val assists: Int = 0,
+    @SerialName("max_kills") val maxKills: Int = 0,
+)
+
+@Serializable
+data class PlayerStatsRequest(
+    val platform: String = "h5",
+    @SerialName("player_id") val playerId: String,
+    @SerialName("tournament_id") val tournamentIds: List<String>,
+)
+
+/** 生涯数据：总战绩 + 个人指标合并后的展示模型 */
+data class PlayerCareerStats(
+    val matchCount: Int = 0,
+    val matchWinCount: Int = 0,
+    val roundCount: Int = 0,
+    val roundWinCount: Int = 0,
+    val kills: Int = 0,
+    val deaths: Int = 0,
+    val assists: Int = 0,
+    val maxKills: Int = 0,
+    val acs: Double? = null,
+    val adr: Double? = null,
+    val kd: Double? = null,
+    val kda: Double? = null,
+    val kast: Double? = null,
+)
+
+/** 特工数据（player/get_valorant_hero_data，近三个月） */
+@Serializable
+data class PlayerHeroData(
+    @SerialName("hero_list") val heroes: List<PlayerHeroStat> = emptyList(),
+)
+
+@Serializable
+data class PlayerHeroStat(
+    val hero: HeroInfo? = null,
+    @SerialName("round_num") val rounds: Int = 0,
+    val acs: Double? = null,
+    val kills: Int = 0,
+    val deaths: Int = 0,
+    val assists: Int = 0,
+    val adr: Double? = null,
+)
+
+/** player/career_info 请求体 */
+@Serializable
+data class PlayerCareerRequest(
+    @SerialName("game_id") val gameId: String,
+    val platform: String = "web",
+    @SerialName("player_id") val playerId: String,
+    val page: Int = 1,
+    @SerialName("page_size") val pageSize: Int = 100,
+)
+
 /** 战队近期数据（team/get_stats，full=false 约 2026 年内） */
 @Serializable
 data class TeamStats(

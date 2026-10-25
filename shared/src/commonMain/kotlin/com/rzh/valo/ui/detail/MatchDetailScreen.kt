@@ -123,6 +123,7 @@ fun MatchDetailScreen(
     matchId: String,
     onBack: () -> Unit,
     onOpenTeamInfo: (Participant?) -> Unit = {},
+    onOpenPlayer: (String, String, String) -> Unit = { _, _, _ -> },
     onOpenTournament: (String, String) -> Unit = { _, _ -> },
 ) {
     val container = LocalAppContainer.current
@@ -171,6 +172,7 @@ fun MatchDetailScreen(
                             state.round,
                             state.foresight,
                             onTeamClick = onOpenTeamInfo,
+                            onOpenPlayer = onOpenPlayer,
                             onOpenTournament = onOpenTournament,
                         )
                     }
@@ -186,6 +188,7 @@ private fun DetailContent(
     round: RoundData,
     foresight: ForesightUiState?,
     onTeamClick: (Participant?) -> Unit,
+    onOpenPlayer: (String, String, String) -> Unit,
     onOpenTournament: (String, String) -> Unit,
 ) {
     val scheme = MiuixTheme.colorScheme
@@ -285,7 +288,7 @@ private fun DetailContent(
         // ---- 地图小局 ----
         if (round.list.isNotEmpty() || round.all.isNotEmpty()) {
             Spacer(Modifier.height(24.dp))
-            MapsSection(round, versus?.mainScore, versus?.guestScore)
+            MapsSection(round, versus?.mainScore, versus?.guestScore, onOpenPlayer)
         } else if (item.status == MatchStatus.SCHEDULED) {
             Spacer(Modifier.height(16.dp))
             Text(
@@ -335,6 +338,7 @@ private fun MapsSection(
     round: RoundData,
     mainSeriesScore: String?,
     guestSeriesScore: String?,
+    onOpenPlayer: (String, String, String) -> Unit,
 ) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(round) { selected = 0 }
@@ -387,12 +391,14 @@ private fun MapsSection(
                         score = mainSeriesScore,
                         columns = FULL_STAT_COLUMNS,
                         rows = fullTeamRows(round.all, main = true),
+                        onOpenPlayer = onOpenPlayer,
                     )
                     TeamStatsCard(
                         team = first?.guestTeam,
                         score = guestSeriesScore,
                         columns = FULL_STAT_COLUMNS,
                         rows = fullTeamRows(round.all, main = false),
+                        onOpenPlayer = onOpenPlayer,
                     )
                 }
             } else {
@@ -404,12 +410,14 @@ private fun MapsSection(
                         score = map.mainScore?.total?.toString(),
                         columns = MAP_STAT_COLUMNS,
                         rows = mapTeamRows(map, main = true),
+                        onOpenPlayer = onOpenPlayer,
                     )
                     TeamStatsCard(
                         team = map.guestTeam,
                         score = map.guestScore?.total?.toString(),
                         columns = MAP_STAT_COLUMNS,
                         rows = mapTeamRows(map, main = false),
+                        onOpenPlayer = onOpenPlayer,
                     )
                 }
             }
@@ -731,8 +739,14 @@ private fun WinIcon(mode: Int, size: Int, tint: Color = Color.White) {
 /** 数据列定义：表头文案 + 固定列宽 */
 private data class StatColumn(val label: String, val width: Dp = 68.dp)
 
-/** 表格一行的视图数据：左侧英雄区 + 姓名 + 各数据列取值 */
-private data class StatsRow(val heroIcons: List<String?>, val name: String, val cells: List<String>)
+/** 表格一行的视图数据：左侧英雄区 + 姓名（可跳转选手详情）+ 各数据列取值 */
+private data class StatsRow(
+    val heroIcons: List<String?>,
+    val name: String,
+    val playerId: String?,
+    val playerIcon: String?,
+    val cells: List<String>,
+)
 
 /** 单图数据列 */
 private val MAP_STAT_COLUMNS = listOf(
@@ -754,6 +768,8 @@ private fun Double?.statText(percent: Boolean = false): String =
 private fun PlayerMapStats.toStatsRow(): StatsRow = StatsRow(
     heroIcons = listOf(hero?.icon),
     name = career?.idName?.takeIf { it.isNotBlank() } ?: player?.realName.orEmpty(),
+    playerId = player?.id,
+    playerIcon = player?.icon,
     cells = listOf(
         "$kills/$deaths/$assists",
         "$fk/$fd",
@@ -767,6 +783,8 @@ private fun PlayerMapStats.toStatsRow(): StatsRow = StatsRow(
 private fun PlayerMatchStats.toStatsRow(): StatsRow = StatsRow(
     heroIcons = hero.map { it.icon },
     name = career?.idName?.takeIf { it.isNotBlank() } ?: player?.realName.orEmpty(),
+    playerId = player?.id,
+    playerIcon = player?.icon,
     cells = listOf(
         "$kills/$deaths/$assists",
         "$fk/$fd",
@@ -795,6 +813,7 @@ private fun TeamStatsCard(
     score: String?,
     columns: List<StatColumn>,
     rows: List<StatsRow>,
+    onOpenPlayer: (String, String, String) -> Unit,
 ) {
     val scheme = MiuixTheme.colorScheme
     val statsScroll = rememberScrollState()
@@ -838,12 +857,22 @@ private fun TeamStatsCard(
                         )
                     }
                     rows.forEachIndexed { index, row ->
+                        val playerId = row.playerId?.takeIf { it.isNotBlank() }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(36.dp)
                                 .background(if (index % 2 == 1) oddRow else Color.Transparent)
+                                .then(
+                                    if (playerId != null) {
+                                        Modifier.clickable {
+                                            onOpenPlayer(playerId, row.name, row.playerIcon.orEmpty())
+                                        }
+                                    } else {
+                                        Modifier
+                                    }
+                                )
                                 .padding(start = 12.dp),
                         ) {
                             Box(Modifier.width(40.dp)) {

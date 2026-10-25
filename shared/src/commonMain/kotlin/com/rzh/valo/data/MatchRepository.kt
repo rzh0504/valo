@@ -73,6 +73,11 @@ class MatchRepository(
     private val teamStatsCache = TtlCache<String, TeamStats>(HALF_DAY_TTL)
     private val teamRecordCache = TtlCache<String, TeamRecord>(HALF_DAY_TTL)
     private val teamRewardCache = TtlCache<String, List<TeamReward>>(HALF_DAY_TTL)
+    private val playerBaseCache = TtlCache<String, PlayerBase>(HALF_DAY_TTL)
+    private val playerAchievementCache = TtlCache<String, List<PlayerAchievement>>(HALF_DAY_TTL)
+    private val playerCareerCache = TtlCache<String, List<PlayerCareer>>(HALF_DAY_TTL)
+    private val playerStatsCache = TtlCache<String, PlayerCareerStats>(HALF_DAY_TTL)
+    private val playerHeroCache = TtlCache<String, PlayerHeroData>(HALF_DAY_TTL)
     private val stageCache = TtlCache<String, List<TournamentStage>>(WINDOW_TTL)
     private val integralCache = TtlCache<Pair<String, String>, List<IntegralGroup>>(WINDOW_TTL)
     private val tournamentListCache = TtlCache<Unit, List<TournamentItem>>(WINDOW_TTL)
@@ -191,6 +196,71 @@ class MatchRepository(
                 throw e
             } catch (e: Exception) {
                 store.loadSeries() ?: throw e
+            }
+        }
+
+    /** 选手基础资料（低频数据，按半天缓存） */
+    suspend fun playerBase(playerId: String, force: Boolean = false): PlayerBase =
+        withContext(Dispatchers.Default) {
+            playerBaseCache.get(playerId, force) { api.playerBase(playerId) }
+        }
+
+    /** 选手赛事成绩（一次返回全部，按半天缓存） */
+    suspend fun playerAchievements(playerId: String, force: Boolean = false): List<PlayerAchievement> =
+        withContext(Dispatchers.Default) {
+            playerAchievementCache.get(playerId, force) { api.playerAchievements(playerId).list }
+        }
+
+    /** 生涯数据：先从赛事成绩中取 S 级赛事，再汇总总战绩与个人指标 */
+    suspend fun playerCareerStats(playerId: String, force: Boolean = false): PlayerCareerStats =
+        withContext(Dispatchers.Default) {
+            playerStatsCache.get(playerId, force) {
+                val sTournamentIds = playerAchievements(playerId, force)
+                    .mapNotNull { it.tournament }
+                    .filter { it.level == "S" && it.id.isNotBlank() }
+                    .map { it.id }
+                    .distinct()
+                val totals = api.playerTopStats(playerId)
+                val stats = if (sTournamentIds.isEmpty()) {
+                    null
+                } else {
+                    runCatching { api.playerStats(playerId, sTournamentIds) }.getOrNull()
+                }
+                PlayerCareerStats(
+                    matchCount = totals.matchCount,
+                    matchWinCount = totals.matchWinCount,
+                    roundCount = totals.roundCount,
+                    roundWinCount = totals.roundWinCount,
+                    kills = stats?.kills ?: 0,
+                    deaths = stats?.deaths ?: 0,
+                    assists = stats?.assists ?: 0,
+                    maxKills = stats?.maxKills ?: 0,
+                    acs = stats?.acs,
+                    adr = stats?.adr,
+                    kd = stats?.kd,
+                    kda = stats?.kda,
+                    kast = stats?.kast,
+                )
+            }
+        }
+
+    /** 常用特工（近三个月，按使用回合降序） */
+    suspend fun playerHeroStats(playerId: String, force: Boolean = false): PlayerHeroData =
+        withContext(Dispatchers.Default) {
+            playerHeroCache.get(playerId, force) {
+                api.playerHeroData(playerId).let { data ->
+                    data.copy(heroes = data.heroes.sortedByDescending { it.rounds })
+                }
+            }
+        }
+
+    /** 选手职业生涯：只保留选手身份，按入队时间倒序 */
+    suspend fun playerCareer(playerId: String, force: Boolean = false): List<PlayerCareer> =
+        withContext(Dispatchers.Default) {
+            playerCareerCache.get(playerId, force) {
+                api.playerCareer(playerId)
+                    .filter { it.careerType == 1 }
+                    .sortedByDescending { it.startDate.orEmpty() }
             }
         }
 

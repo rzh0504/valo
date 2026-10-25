@@ -135,6 +135,67 @@ class HaojiaoApi {
     suspend fun teamRecord(teamId: String): TeamRecord =
         exec(jsonRequest(HttpMethod.Post, "$BASE/wiki/api/v1/tournament/get_team_record", json.encodeToString(TeamStatsRequest(teamId, GAME_ID))))
 
+    /** 选手基础资料（web 前端在用，文档未收录；player_id 即 person_id） */
+    suspend fun playerBase(playerId: String): PlayerBase =
+        exec(
+            get("$BASE/wiki/api/v1/player/base") {
+                parameters.append("player_id", playerId)
+                parameters.append("game_id", GAME_ID)
+                parameters.append("platform", "web")
+            }
+        )
+
+    /** 选手赛事成绩（一次取全部，仅用于推导 S 级赛事） */
+    suspend fun playerAchievements(playerId: String): PlayerAchievementData =
+        exec(
+            get("$BASE/wiki/api/v1/player/achievement") {
+                parameters.append("player_id", playerId)
+                parameters.append("game_id", GAME_ID)
+                parameters.append("platform", "h5")
+                parameters.append("page", "1")
+                parameters.append("page_size", "9999")
+            }
+        )
+
+    /** 生涯数据 · S 级赛事总场次/回合 */
+    suspend fun playerTopStats(playerId: String): PlayerTopStats =
+        exec(
+            get("$BASE/wiki/api/v1/player/get_top_tournament_stats") {
+                parameters.append("platform", "h5")
+                parameters.append("player_id", playerId)
+            }
+        )
+
+    /** 生涯数据 · 指定赛事汇总的个人指标（POST） */
+    suspend fun playerStats(playerId: String, tournamentIds: List<String>): PlayerStats =
+        exec(
+            jsonRequest(
+                HttpMethod.Post,
+                "$BASE/wiki/api/v1/player/get_stats",
+                json.encodeToString(PlayerStatsRequest(playerId = playerId, tournamentIds = tournamentIds)),
+            )
+        )
+
+    /** 选手常用特工（近三个月） */
+    suspend fun playerHeroData(playerId: String): PlayerHeroData =
+        exec(
+            get("$BASE/wiki/api/v1/player/get_valorant_hero_data") {
+                parameters.append("platform", "h5")
+                parameters.append("player_id", playerId)
+                parameters.append("full", "false")
+            }
+        )
+
+    /** 选手职业生涯（曾效力战队与起止时间，POST） */
+    suspend fun playerCareer(playerId: String): List<PlayerCareer> =
+        exec(
+            jsonRequest(
+                HttpMethod.Post,
+                "$BASE/wiki/api/v1/player/career_info",
+                json.encodeToString(PlayerCareerRequest(gameId = GAME_ID, playerId = playerId)),
+            )
+        )
+
     /** 赛事名次与奖金（分页） */
     suspend fun teamRewards(teamId: String, page: Int, pageSize: Int): TeamRewardData =
         exec(
