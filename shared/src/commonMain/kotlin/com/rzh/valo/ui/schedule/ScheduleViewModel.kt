@@ -84,15 +84,28 @@ class ScheduleViewModel(
     private var loadJob: Job? = null
     /** 上次发起联网加载的时间，作为回前台是否再验证的依据 */
     private var lastRequestedAt = 0L
+    /** 屏蔽设置与系列映射就绪前不渲染，避免冷启动先闪出未过滤的赛程 */
+    private var filterReady = false
 
     init {
         viewModelScope.launch {
-            settingsStore.scheduleHiddenSeries.collectLatest {
-                hiddenSeries = it
-                recompute()
+            settingsStore.scheduleHiddenSeries.collectLatest { hidden ->
+                hiddenSeries = hidden
+                if (filterReady) recompute() else prepareFilter()
             }
         }
-        fetchSeriesMap()
+    }
+
+    private suspend fun prepareFilter() {
+        val cachedMap = runCatching { repository.cachedSeriesMap() }.getOrNull()
+        if (cachedMap == null) {
+            // 首次安装没有映射快照：等联网结果（失败则为空映射，过滤自动降级）
+            seriesMap = runCatching { repository.tournamentSeriesMap() }.getOrDefault(emptyMap())
+        } else {
+            seriesMap = cachedMap
+            fetchSeriesMap()
+        }
+        filterReady = true
         loadCached()
     }
 
@@ -101,6 +114,7 @@ class ScheduleViewModel(
 
     /** 回到前台：距上次发起加载超过接口层缓存 TTL 时静默再验证，覆盖进程存活的热启动 */
     fun onResume() {
+        if (!filterReady) return
         if (nowMillis() - lastRequestedAt > MatchRepository.WINDOW_TTL) {
             loadInternal(force = false)
         }

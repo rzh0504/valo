@@ -4,12 +4,15 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import okio.Path.Companion.toPath
 
@@ -75,9 +78,13 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
     }
 
     /** 赛程中屏蔽的系列赛 id；未写入时默认屏蔽目录中的非热门系列，目录外系列始终显示。 */
-    val scheduleHiddenSeries: Flow<Set<String>> = dataStore.data.map {
-        it[hiddenSeriesKey] ?: DEFAULT_HIDDEN_SERIES
-    }
+    val scheduleHiddenSeries: Flow<Set<String>> = dataStore.data
+        // 赛程渲染以本流就绪为前提，读取异常时回退默认值而不是让界面一直等待
+        .catch { e ->
+            if (e is CancellationException) throw e
+            emit(emptyPreferences())
+        }
+        .map { it[hiddenSeriesKey] ?: DEFAULT_HIDDEN_SERIES }
 
     /** 赛事页「保存筛选」开关（默认关闭，关闭时不读写筛选值） */
     val tournamentFiltersSaved: Flow<Boolean> = dataStore.data.map {
