@@ -255,6 +255,7 @@ data class PlayerStatsRequest(
 )
 
 /** 生涯数据：总战绩 + 个人指标合并后的展示模型 */
+@Serializable
 data class PlayerCareerStats(
     val matchCount: Int = 0,
     val matchWinCount: Int = 0,

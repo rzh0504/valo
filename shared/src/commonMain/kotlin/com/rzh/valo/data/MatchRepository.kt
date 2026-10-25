@@ -5,6 +5,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 
 /**
  * 内存缓存：TTL + 按 key 单飞（同一 key 同时只有一个在途请求，不同 key 互不阻塞），
@@ -15,28 +18,40 @@ internal class TtlCache<K : Any, V : Any>(
     private val now: () -> Long = ::nowMillis,
 ) {
 
-    private class Entry<V>(val data: V, val fetchedAt: Long)
+    private class Entry<V>(val data: V, val fetchedAt: Long, val ttl: Long) {
+        fun isValid(nowMs: Long): Boolean = nowMs - fetchedAt < ttl
+    }
 
     private val entries = HashMap<K, Entry<V>>()
     private val locks = HashMap<K, Mutex>()
     private val mapMutex = Mutex()
 
-    suspend fun get(key: K, force: Boolean, fetch: suspend () -> V): V {
+    /** [ttl] 可按值决定有效期（如已结束比赛用长缓存），默认使用构造时的 TTL */
+    suspend fun get(
+        key: K,
+        force: Boolean,
+        ttl: (V) -> Long = { ttlMillis },
+        fetch: suspend () -> V,
+    ): V {
         val keyMutex = mapMutex.withLock { locks.getOrPut(key) { Mutex() } }
         return keyMutex.withLock {
             val cached = mapMutex.withLock { entries[key] }
-            val nowMs = now()
-            if (!force && cached != null && nowMs - cached.fetchedAt < ttlMillis) {
+            if (!force && cached != null && cached.isValid(now())) {
                 cached.data
             } else {
-                fetch().also { put(key, it, nowMs) }
+                fetch().also { put(key, it, ttl(it)) }
             }
         }
     }
 
-    private suspend fun put(key: K, value: V, nowMs: Long) {
+    /** 只读未过期条目，用于接入磁盘兜底 */
+    suspend fun peek(key: K): V? = mapMutex.withLock {
+        entries[key]?.takeIf { it.isValid(now()) }?.data
+    }
+
+    suspend fun put(key: K, value: V, ttl: Long = ttlMillis) {
         mapMutex.withLock {
-            entries[key] = Entry(value, nowMs)
+            entries[key] = Entry(value, now(), ttl)
             if (entries.size > MAX_ENTRIES) {
                 entries.entries
                     .sortedBy { it.value.fetchedAt }
@@ -49,6 +64,42 @@ internal class TtlCache<K : Any, V : Any>(
     companion object {
         const val MAX_ENTRIES = 32
     }
+}
+
+/**
+ * 长缓存：内存 TTL + 磁盘 JSON 兜底，仅用于低频数据。
+ * 冷启动先读磁盘可避免整页重新联网；下拉刷新（force）会绕过两者。
+ */
+private class LongCache<K : Any, V : Any>(
+    private val prefix: String,
+    private val ttlMillis: Long,
+    private val store: SnapshotStore,
+    private val keyText: (K) -> String,
+    private val encode: (V) -> String,
+    private val decode: (String) -> V,
+) {
+    private val memory = TtlCache<K, V>(ttlMillis)
+
+    suspend fun get(key: K, force: Boolean, fetch: suspend () -> V): V {
+        if (!force) {
+            memory.peek(key)?.let { return it }
+            store.loadCachedJson(diskKey(key), ttlMillis)?.let { cached ->
+                // 恢复剩余有效期，避免磁盘命中后把旧数据再续满一个完整 TTL
+                val remaining = cached.savedAt + ttlMillis - nowMillis()
+                if (remaining > 0) {
+                    runCatching { decode(cached.json) }.getOrNull()?.let {
+                        memory.put(key, it, remaining)
+                        return it
+                    }
+                }
+            }
+        }
+        val value = memory.get(key, force) { fetch() }
+        store.saveCachedJson(diskKey(key), encode(value))
+        return value
+    }
+
+    private fun diskKey(key: K) = "$prefix/${keyText(key)}"
 }
 
 /**
@@ -68,20 +119,57 @@ class MatchRepository(
     private val fightCache = TtlCache<String, FightHistoryData>(DETAIL_TTL)
     private val mapForesightCache = TtlCache<String, List<MapRecord>>(DETAIL_TTL)
     private val gameMapCache = TtlCache<String, Set<String>>(DAY)
-    private val teamBaseCache = TtlCache<String, TeamBase>(HALF_DAY_TTL)
-    private val teamRosterCache = TtlCache<String, TeamRoster>(HALF_DAY_TTL)
-    private val teamStatsCache = TtlCache<String, TeamStats>(HALF_DAY_TTL)
-    private val teamRecordCache = TtlCache<String, TeamRecord>(HALF_DAY_TTL)
-    private val teamRewardCache = TtlCache<String, List<TeamReward>>(HALF_DAY_TTL)
-    private val playerBaseCache = TtlCache<String, PlayerBase>(HALF_DAY_TTL)
-    private val playerAchievementCache = TtlCache<String, List<PlayerAchievement>>(HALF_DAY_TTL)
-    private val playerCareerCache = TtlCache<String, List<PlayerCareer>>(HALF_DAY_TTL)
-    private val playerStatsCache = TtlCache<String, PlayerCareerStats>(HALF_DAY_TTL)
-    private val playerHeroCache = TtlCache<String, PlayerHeroData>(HALF_DAY_TTL)
-    private val stageCache = TtlCache<String, List<TournamentStage>>(WINDOW_TTL)
-    private val integralCache = TtlCache<Pair<String, String>, List<IntegralGroup>>(WINDOW_TTL)
-    private val tournamentListCache = TtlCache<Unit, List<TournamentItem>>(WINDOW_TTL)
     private val seriesCache = TtlCache<Unit, Map<String, String>>(DAY)
+
+    private val cacheJson = Json {
+        ignoreUnknownKeys = true
+        coerceInputValues = true
+        explicitNulls = false
+    }
+
+    // 低频资料：内存 + 磁盘双缓存，冷启动不再为整页数据联网
+    private val teamBaseCache = longCache("team_base", LONG_TTL, TeamBase.serializer())
+    private val teamRosterCache = longCache("team_roster", LONG_TTL, TeamRoster.serializer())
+    private val teamStatsCache = longCache("team_stats", STATS_TTL, TeamStats.serializer())
+    private val teamRecordCache = longCache("team_record", LONG_TTL, TeamRecord.serializer())
+    private val teamRewardCache = longCache("team_rewards", LONG_TTL, ListSerializer(TeamReward.serializer()))
+    private val playerBaseCache = longCache("player_base", LONG_TTL, PlayerBase.serializer())
+    private val playerAchievementCache =
+        longCache("player_achievements", LONG_TTL, ListSerializer(PlayerAchievement.serializer()))
+    private val playerCareerCache = longCache("player_career", LONG_TTL, ListSerializer(PlayerCareer.serializer()))
+    private val playerStatsCache = longCache("player_career_stats", STATS_TTL, PlayerCareerStats.serializer())
+    private val playerHeroCache = longCache("player_hero_stats", STATS_TTL, PlayerHeroData.serializer())
+    private val stageCache = longCache("tournament_stages", TOURNAMENT_TTL, ListSerializer(TournamentStage.serializer()))
+    private val integralCache = LongCache<Pair<String, String>, List<IntegralGroup>>(
+        prefix = "tournament_integral",
+        ttlMillis = TOURNAMENT_TTL,
+        store = store,
+        keyText = { "${it.first}_${it.second}" },
+        encode = { cacheJson.encodeToString(ListSerializer(IntegralGroup.serializer()), it) },
+        decode = { cacheJson.decodeFromString(ListSerializer(IntegralGroup.serializer()), it) },
+    )
+    private val tournamentListCache = LongCache<Unit, List<TournamentItem>>(
+        prefix = "tournament_list",
+        ttlMillis = TOURNAMENT_TTL,
+        store = store,
+        keyText = { "all" },
+        encode = { cacheJson.encodeToString(ListSerializer(TournamentItem.serializer()), it) },
+        decode = { cacheJson.decodeFromString(ListSerializer(TournamentItem.serializer()), it) },
+    )
+
+    private fun <V : Any> longCache(
+        prefix: String,
+        ttlMillis: Long,
+        serializer: KSerializer<V>,
+        keyText: (String) -> String = { it },
+    ): LongCache<String, V> = LongCache(
+        prefix = prefix,
+        ttlMillis = ttlMillis,
+        store = store,
+        keyText = keyText,
+        encode = { cacheJson.encodeToString(serializer, it) },
+        decode = { cacheJson.decodeFromString(serializer, it) },
+    )
 
     /**
      * 拉取 [startTime, endTime) 时间窗内的比赛（升序）。
@@ -148,7 +236,7 @@ class MatchRepository(
             api.valorantMaps().filter { it.status == 1 }.map { it.id }.toSet()
         }
 
-    // ---------- 战队详情（低频历史数据，统一 [HALF_DAY_TTL] 缓存） ----------
+    // ---------- 战队详情（低频历史数据，长缓存并持久化） ----------
 
     suspend fun teamBase(teamId: String, force: Boolean = false): TeamBase =
         withContext(Dispatchers.Default) {
@@ -287,10 +375,38 @@ class MatchRepository(
             }
         }
 
-    /** 比赛详情，单条缓存 [DETAIL_TTL]。 */
+    /**
+     * 比赛详情：已结束的比赛不再变化，缓存 [FINISHED_TTL] 并落盘；
+     * 未结束的保持 [DETAIL_TTL]，避免比分与状态展示过旧。
+     */
     suspend fun matchDetail(matchId: String, force: Boolean = false): MatchItem =
         withContext(Dispatchers.Default) {
-            detailCache.get(matchId, force) { api.battleDetail(matchId) }
+            if (!force) {
+                detailCache.peek(matchId)?.let { return@withContext it }
+                store.loadCachedJson("match_detail/$matchId", FINISHED_TTL)?.let { cached ->
+                    val remaining = cached.savedAt + FINISHED_TTL - nowMillis()
+                    if (remaining > 0) {
+                        runCatching {
+                            cacheJson.decodeFromString(MatchItem.serializer(), cached.json)
+                        }.getOrNull()?.let {
+                            detailCache.put(matchId, it, remaining)
+                            return@withContext it
+                        }
+                    }
+                }
+            }
+            val item = detailCache.get(
+                matchId,
+                force,
+                ttl = { if (it.status == MatchStatus.FINISHED) FINISHED_TTL else DETAIL_TTL },
+            ) { api.battleDetail(matchId) }
+            if (item.status == MatchStatus.FINISHED) {
+                store.saveCachedJson(
+                    "match_detail/$matchId",
+                    cacheJson.encodeToString(MatchItem.serializer(), item),
+                )
+            }
+            item
         }
 
     /** 逐回合地图明细（未开赛时为空数据），单条缓存 [DETAIL_TTL]。 */
@@ -298,6 +414,11 @@ class MatchRepository(
         withContext(Dispatchers.Default) {
             roundCache.get(matchId, force) { api.roundData(matchId) }
         }
+
+    /** 详情确认已结束后，把逐回合数据提升为长缓存（体积较大，仅内存） */
+    suspend fun cacheFinishedRound(matchId: String, round: RoundData) {
+        if (round.list.isNotEmpty()) roundCache.put(matchId, round, FINISHED_TTL)
+    }
 
     /** 保存/读取快照（仅默认时间窗的数据会写入，供小组件使用）；[coveredStart, coveredEnd) 为数据实际覆盖的时间窗。 */
     suspend fun saveSnapshot(items: List<MatchItem>, coveredStart: Long, coveredEnd: Long) =
@@ -441,7 +562,13 @@ class MatchRepository(
         // internal：页面层回前台的再验证间隔与它保持一致
         internal const val WINDOW_TTL = 5 * 60_000L
         private const val DETAIL_TTL = 15 * 60_000L
-        private const val HALF_DAY_TTL = 12 * HOUR
+        /** 已结束比赛与历史资料不再变化，缓存一周并持久化 */
+        private const val FINISHED_TTL = 7 * DAY
+        private const val LONG_TTL = 7 * DAY
+        /** 随赛程推进缓慢变化的统计（战队/选手数据、特工数据） */
+        private const val STATS_TTL = DAY
+        /** 赛事列表、阶段与积分榜 */
+        private const val TOURNAMENT_TTL = 6 * HOUR
         private const val SNAPSHOT_TTL = 24 * 60 * 60_000L
         private const val HOME_SNAPSHOT_TTL = WINDOW_TTL
         // internal：页面层的翻页结束判断（不足一页即最后一页）与它保持一致

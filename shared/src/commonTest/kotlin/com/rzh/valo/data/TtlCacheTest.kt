@@ -53,6 +53,19 @@ class TtlCacheTest {
     }
 
     @Test
+    fun `按值 TTL 覆盖默认时长`() = runTest {
+        val cache = cache(ttl = 1000L)
+        var fetches = 0
+        cache.get("k", force = false, ttl = { 5000L }) { ++fetches }
+        clock += 2000
+        cache.get("k", force = false, ttl = { 5000L }) { ++fetches }
+        assertEquals(1, fetches)
+        clock += 3001
+        cache.get("k", force = false, ttl = { 5000L }) { ++fetches }
+        assertEquals(2, fetches)
+    }
+
+    @Test
     fun `超过容量淘汰最早条目`() = runTest {
         val cache = cache(ttl = Long.MAX_VALUE)
         var fetches = 0

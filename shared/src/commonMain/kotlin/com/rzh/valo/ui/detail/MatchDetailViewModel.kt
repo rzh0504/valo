@@ -128,6 +128,9 @@ class MatchDetailViewModel(
         }
         val item = repository.matchDetail(matchId, force)
         val roundData = round.await()
+        if (item.status == MatchStatus.FINISHED) {
+            repository.cacheFinishedRound(matchId, roundData)
+        }
         item to if (item.status == MatchStatus.SCHEDULED) RoundData() else roundData
     }
 }

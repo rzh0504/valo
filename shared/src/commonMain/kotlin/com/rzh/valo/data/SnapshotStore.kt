@@ -9,6 +9,17 @@ import kotlinx.serialization.json.Json
 import okio.FileSystem
 import okio.Path.Companion.toPath
 
+private const val MAX_API_CACHE_ENTRIES = 300
+
+@Serializable
+private data class ApiCacheEntry(val json: String = "", val savedAt: Long = 0L)
+
+@Serializable
+private data class ApiCacheFile(val entries: Map<String, ApiCacheEntry> = emptyMap())
+
+/** 磁盘长缓存条目：内容 + 写入时间，供内存缓存恢复剩余有效期 */
+class CachedJson(val json: String, val savedAt: Long)
+
 /**
  * 磁盘快照：最近一次赛程数据落盘，供桌面小组件离线渲染、应用冷启动兜底。
  */
@@ -33,7 +44,9 @@ class SnapshotStore(baseDir: String) {
     private val fs = FileSystem.SYSTEM
     private val file = "$baseDir/schedule_snapshot.json".toPath()
     private val seriesFile = "$baseDir/series_index.json".toPath()
+    private val apiCacheFile = "$baseDir/api_cache.json".toPath()
     private val mutex = Mutex()
+    private var apiCache: ApiCacheFile? = null
 
     suspend fun save(items: List<MatchItem>, coveredStart: Long, coveredEnd: Long) = mutex.withLock {
         val previous = loadLocked()
@@ -71,6 +84,36 @@ class SnapshotStore(baseDir: String) {
     suspend fun saveSeries(seriesMap: Map<String, String>) = mutex.withLock { writeJson(seriesFile, seriesMap) }
 
     suspend fun loadSeries(): Map<String, String>? = mutex.withLock { readJson(seriesFile) }
+
+    /**
+     * 长缓存 JSON 兜底：键值 + 写入时间统一存在一个文件里，供低频接口冷启动直接命中，
+     * 超过 [maxAgeMillis] 视为过期。整个文件在内存中保留一份，避免重复读取。
+     */
+    suspend fun loadCachedJson(key: String, maxAgeMillis: Long): CachedJson? = mutex.withLock {
+        val entry = loadApiCacheLocked().entries[key]
+        if (entry == null || nowMillis() - entry.savedAt > maxAgeMillis) {
+            null
+        } else {
+            CachedJson(entry.json, entry.savedAt)
+        }
+    }
+
+    suspend fun saveCachedJson(key: String, json: String) = mutex.withLock {
+        val entries = loadApiCacheLocked().entries.toMutableMap()
+        entries[key] = ApiCacheEntry(json = json, savedAt = nowMillis())
+        if (entries.size > MAX_API_CACHE_ENTRIES) {
+            entries.entries
+                .sortedBy { it.value.savedAt }
+                .take(entries.size - MAX_API_CACHE_ENTRIES)
+                .forEach { entries.remove(it.key) }
+        }
+        val next = ApiCacheFile(entries)
+        apiCache = next
+        writeJson(apiCacheFile, next)
+    }
+
+    private fun loadApiCacheLocked(): ApiCacheFile =
+        apiCache ?: readJson<ApiCacheFile>(apiCacheFile)?.also { apiCache = it } ?: ApiCacheFile()
 
     private fun loadLocked(): Snapshot? = readJson(file)
 
