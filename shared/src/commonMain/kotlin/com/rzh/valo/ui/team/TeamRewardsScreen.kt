@@ -4,19 +4,24 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -24,6 +29,7 @@ import com.rzh.valo.data.TeamReward
 import com.rzh.valo.ui.LocalAppContainer
 import com.rzh.valo.ui.Route
 import com.rzh.valo.ui.components.LoadingPane
+import com.rzh.valo.ui.components.TeamLogo
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
@@ -90,7 +96,7 @@ private fun RewardsList(rewards: List<TeamReward>) {
     val scheme = MiuixTheme.colorScheme
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
         if (rewards.isEmpty()) {
@@ -111,17 +117,61 @@ private fun RewardsList(rewards: List<TeamReward>) {
                     color = scheme.onSurfaceVariantSummary,
                 )
             }
-            item(key = "table") {
-                Card(
-                    cornerRadius = 16.dp,
-                    insideMargin = PaddingValues(0.dp),
-                    colors = CardDefaults.defaultColors(color = scheme.surfaceContainer),
-                ) {
-                    Column(Modifier.fillMaxWidth()) {
-                        RewardTableHeader()
-                        rewards.forEachIndexed { index, reward -> RewardRow(reward, index) }
-                    }
-                }
+            items(
+                items = rewards,
+                key = { it.id.ifBlank { "${it.group?.id}_${it.rewardTime}" } },
+            ) { reward ->
+                RewardCard(reward)
+            }
+        }
+    }
+}
+
+/** 全部名次用卡片展示：徽标 + 赛事名/日期/战绩 + 名次（不展示奖金） */
+@Composable
+private fun RewardCard(reward: TeamReward) {
+    val scheme = MiuixTheme.colorScheme
+    val meta = listOfNotNull(
+        reward.date?.substringBefore(' ')?.takeIf { it.isNotBlank() },
+        "${reward.matchWinCount}胜${reward.matchCount - reward.matchWinCount}负",
+    ).joinToString(" · ")
+    Card(
+        cornerRadius = 16.dp,
+        insideMargin = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+        colors = CardDefaults.defaultColors(color = scheme.surfaceContainer),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            TeamLogo(reward.group?.icon, size = 40)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    reward.group?.nameMain.orEmpty(),
+                    style = MiuixTheme.textStyles.body2,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    meta,
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = scheme.onSurfaceVariantSummary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (!reward.rank.isNullOrBlank()) {
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    reward.rank,
+                    style = MiuixTheme.textStyles.footnote1,
+                    fontWeight = FontWeight.SemiBold,
+                    color = scheme.primary,
+                    maxLines = 1,
+                )
             }
         }
     }
