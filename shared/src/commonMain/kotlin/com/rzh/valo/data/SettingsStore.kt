@@ -57,11 +57,25 @@ data class TournamentSavedFilters(
     val status: Int = 0,
 )
 
+/**
+ * 读取屏蔽集：存储的目录批次早于当前批次时，补入之后新收录的系列。
+ * 用户手动改过一次屏蔽集后批次号随之更新，此后完全按存储值为准。
+ * [stored] 为 null 表示从未改过过滤，直接用默认屏蔽集。
+ */
+internal fun effectiveHiddenSeries(stored: Set<String>?, revision: Int): Set<String> {
+    val base = stored ?: DEFAULT_HIDDEN_SERIES
+    val added = SERIES_ADDED_BY_REVISION.entries
+        .filter { it.key > revision }
+        .flatMap { it.value }
+    return if (added.isEmpty()) base else base + added
+}
+
 /** 应用设置（DataStore 持久化，文件与应用内目录沿用以兼容旧版升级） */
 class SettingsStore(private val dataStore: DataStore<Preferences>) {
 
     private val themeKey = intPreferencesKey("theme_mode")
     private val hiddenSeriesKey = stringSetPreferencesKey("schedule_hidden_series")
+    private val hiddenSeriesRevisionKey = intPreferencesKey("schedule_hidden_series_revision")
     private val navBarStyleKey = intPreferencesKey("nav_bar_style")
     private val tournamentSaveFiltersKey = booleanPreferencesKey("tournament_save_filters")
     private val tournamentZoneKey = stringPreferencesKey("tournament_zone")
@@ -84,7 +98,12 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
             if (e is CancellationException) throw e
             emit(emptyPreferences())
         }
-        .map { it[hiddenSeriesKey] ?: DEFAULT_HIDDEN_SERIES }
+        .map {
+            effectiveHiddenSeries(
+                it[hiddenSeriesKey],
+                it[hiddenSeriesRevisionKey] ?: 0,
+            )
+        }
 
     /** 赛事页「保存筛选」开关（默认关闭，关闭时不读写筛选值） */
     val tournamentFiltersSaved: Flow<Boolean> = dataStore.data.map {
@@ -126,9 +145,11 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
     suspend fun setSeriesHidden(id: String, hidden: Boolean) {
         if (id.isBlank()) return
         dataStore.edit {
-            val series = (it[hiddenSeriesKey] ?: DEFAULT_HIDDEN_SERIES).toMutableSet()
+            val revision = it[hiddenSeriesRevisionKey] ?: 0
+            val series = effectiveHiddenSeries(it[hiddenSeriesKey], revision).toMutableSet()
             if (hidden) series += id else series -= id
             it[hiddenSeriesKey] = series
+            it[hiddenSeriesRevisionKey] = CURRENT_SERIES_REVISION
         }
     }
 

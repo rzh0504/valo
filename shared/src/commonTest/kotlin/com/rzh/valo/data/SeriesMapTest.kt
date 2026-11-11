@@ -38,6 +38,8 @@ class SeriesMapTest {
     @Test
     fun `默认屏蔽目录中的非热门系列`() {
         assertTrue("w6ioCQaTSQTcZ5nm" in DEFAULT_HIDDEN_SERIES)
+        assertTrue("vb9uUS7HHCkedyCW" in DEFAULT_HIDDEN_SERIES)
+        assertTrue("MDe1QzFOucnKexmp" in DEFAULT_HIDDEN_SERIES)
         assertEquals(
             setOf(
                 "ZVDYkTwFSFrcOSDY",
@@ -49,6 +51,33 @@ class SeriesMapTest {
             ),
             SERIES_CATALOG.filter { it.popular }.map { it.id }.toSet(),
         )
+    }
+
+    @Test
+    fun `旧批次屏蔽集读取时补入后收录系列`() {
+        val stored = setOf("w6ioCQaTSQTcZ5nm")
+        val migrated = effectiveHiddenSeries(stored, revision = 0)
+        assertTrue("MDe1QzFOucnKexmp" in migrated)
+        assertTrue("vb9uUS7HHCkedyCW" in migrated)
+        assertTrue("w6ioCQaTSQTcZ5nm" in migrated)
+    }
+
+    @Test
+    fun `当前批次屏蔽集不再补入 保留用户取消的系列`() {
+        // 用户在批次 1 之后手动放开了后补系列，读取时不应被重新屏蔽
+        val stored = setOf("w6ioCQaTSQTcZ5nm")
+        assertEquals(stored, effectiveHiddenSeries(stored, revision = 1))
+    }
+
+    @Test
+    fun `从未编辑过过滤时用默认屏蔽集`() {
+        assertEquals(DEFAULT_HIDDEN_SERIES, effectiveHiddenSeries(stored = null, revision = 0))
+    }
+
+    @Test
+    fun `后补系列 id 均在目录中`() {
+        val catalogIds = SERIES_CATALOG.map { it.id }.toSet()
+        assertTrue(SERIES_ADDED_BY_REVISION.values.flatten().all { it in catalogIds })
     }
 
     @Test

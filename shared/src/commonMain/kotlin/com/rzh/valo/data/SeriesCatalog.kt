@@ -39,8 +39,22 @@ val SERIES_CATALOG = listOf(
     SeriesSummary("PSRuj3kEOoh6LTLq", "Riot Games ONE", "Riot ONE", "/cms/20241125/1732516111646.png"),
     SeriesSummary("culJerpAF59wc3zO", "TEN邀请赛", "TEN", "/cms/20251022/1761102706738.png"),
     SeriesSummary("4axVz4KM3ycZPixD", "TPL系列赛事", "TPL", "/cms/20261016/1792114755500-tpl-logo-source-highres.png"),
+    SeriesSummary("MDe1QzFOucnKexmp", "启点赛 预选赛", "KO Qualifier", "/cms/20261027/1793084063522.jpg"),
+    SeriesSummary("vb9uUS7HHCkedyCW", "Spike Series", null, "/cms/20261102/1793616384566-spike-series-official.png"),
 )
 
 /** 默认屏蔽 = 目录中的非热门系列 */
 val DEFAULT_HIDDEN_SERIES: Set<String> =
     SERIES_CATALOG.filterNot { it.popular }.map { it.id }.toSet()
+
+/**
+ * 后补收录的系列，按收录批次登记：旧版本保存的屏蔽集不含这些 id，
+ * 读取时按存储的批次号补入，避免升级后新系列重新漏出。
+ * 新增系列时加入 [SERIES_CATALOG]，并把 id 登记到下一个批次。
+ */
+val SERIES_ADDED_BY_REVISION: Map<Int, Set<String>> = mapOf(
+    1 to setOf("MDe1QzFOucnKexmp", "vb9uUS7HHCkedyCW"),
+)
+
+/** 当前目录批次；写入屏蔽集时记录，读取旧值时据此补入之后新增的系列 */
+val CURRENT_SERIES_REVISION: Int = SERIES_ADDED_BY_REVISION.keys.maxOrNull() ?: 0
